@@ -1,3 +1,5 @@
 .ccls*
 *.o
 tinyrenderer
+build
+compile_commands.json
