@@ -56,8 +56,7 @@ int main(int argc, char** argv) {
     clearImage(image);
     //
 
-    u32 red = 255 | (0 << 8) | (0 << 16) | (255 << 24);  // ABGR
-    u32 white = 255 | (0 << 8) | (0 << 16) | (0 << 24);
+    u32 red = 255 | (0 << 8) | (0 << 16) | (0 << 24);
     //
 
     GLuint renderTextureId;
@@ -65,9 +64,28 @@ int main(int argc, char** argv) {
 
     GLuint renderVAO = initTextureRender(image.width, image.height, renderTextureId, renderShaderProgramId);
 
-    int lastY = 0;
+
+    double currentFrame = glfwGetTime();
+    double lastFrame = currentFrame;
+    double deltaTime;
+
+    double lastY = 0;
+    bool lockFramerate = true;
 
     while (!glfwWindowShouldClose(window)) {
+        currentFrame = glfwGetTime();
+        deltaTime = currentFrame - lastFrame;
+        float timeInMs = deltaTime * 1000.0f;
+
+        if (lockFramerate) {
+            while (timeInMs < 16.666f)
+            {
+                currentFrame = glfwGetTime();
+                deltaTime = currentFrame - lastFrame;
+                timeInMs = deltaTime * 1000.0f;
+            }
+        }
+
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
         glDisable(GL_DEPTH_TEST);
@@ -79,12 +97,13 @@ int main(int argc, char** argv) {
         // strobe light
         float lastYOffset = (sin(lastY) + 1)/2;
         float midPoint = 50;
-        line(0, lastYOffset * image.height, midPoint, midPoint, image, white);
-        line(midPoint, midPoint, 100, lastYOffset * image.height, image, white);
-        lastY++;
-        if (lastY == 100) {
+        line(0, lastYOffset * image.height, midPoint, midPoint, image, red);
+        line(midPoint, midPoint, 100, lastYOffset * image.height, image, red);
+        lastY += .1;
+        if (lastY > 100) {
             lastY = 0;
         }
+        //
 
         glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, image.width, image.height, GL_RGBA, GL_UNSIGNED_BYTE, image.buffer);
 
