@@ -6,11 +6,10 @@
 #include <assert.h>
 #include <stdarg.h>
 
-#define print(format, ...) \
-    printf("%s\t| %s:%d\t| " format "\n", __FUNCTION__, __FILE__, __LINE__, ##__VA_ARGS__)
-
 #include <GL/glew.h>
 #include <GLFW/glfw3.h>
+#include "types.h"
+#include "debug.h"
 
 
 void loadFileContents(const char* file_path, char* buffer)
@@ -26,7 +25,7 @@ uint8_t compileShader(GLuint shader_id, const char* shader_path)
 {
     print("Compiling shader %s", shader_path);
 
-    uint32_t buffer_size = 1000;
+    u32 buffer_size = 1000;
     char* shaderBuffer = (char*)calloc(1, sizeof(char) * buffer_size);
     loadFileContents(shader_path, shaderBuffer);
     glShaderSource(shader_id, 1, &shaderBuffer, NULL);
@@ -115,7 +114,7 @@ GLuint initTextureRender(int width, int height, GLuint renderTextureId, GLuint p
         1.0f,  1.0f, 0.0f,   1.0f, 1.0f, 0.0f,   1.0f, 1.0f  // top left 
     };
 
-    uint32_t renderIndices[] = {
+    u32 renderIndices[] = {
         0, 1, 3, // first triangle
         1, 2, 3  // second triangle
     };
