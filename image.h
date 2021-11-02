@@ -1,5 +1,5 @@
-#ifndef RENDERH
-#define RENDERH
+#ifndef IMAGEH
+#define IMAGEH
 
 #include <stdlib.h>
 #include "types.h"
@@ -22,4 +22,4 @@ void drawPixel(u32 x, u32 y, u32 color, Image &image) {
 }
 
 
-#endif // RENDERH
+#endif // IMAGEH

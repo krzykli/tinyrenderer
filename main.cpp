@@ -18,24 +18,43 @@ int WINDOW_HEIGHT = 100;
 
 const char* WINDOW_TITLE = "Tiny Renderer";
 
-void line(int x0, int y0, int x1, int y1, Image &image, u32 color) {
+//
+u32 RED = 255 | (0 << 8) | (0 << 16) | (0 << 24);
+u32 WHITE = 255 | (255 << 8) | (255 << 16) | (255 << 24);
+//
+
+
+void line(int x0, int y0, int x1, int y1, Image &image, u32 color) { 
     bool steep = false;
-    if (std::abs(x0-x1)<std::abs(y0-y1)) { // if the line is steep, we transpose the image 
+    if (std::abs(x0 - x1) < std::abs(y0 - y1)) {
         std::swap(x0, y0);
         std::swap(x1, y1);
         steep = true;
     }
-    if (x0>x1) { // make it left−to−right
+
+    if (x0 > x1) {
         std::swap(x0, x1);
         std::swap(y0, y1);
     }
-    for (int x=x0; x<=x1; x++) {
-        float t = (x-x0)/(float)(x1-x0);
-        int y = y0*(1.-t) + y1*t;
+
+    int dx = x1 - x0;
+    int dy = y1 - y0;
+
+    int derror2 = std::abs(dy) * 2;
+    int error2 = 0;
+    int y = y0;
+
+    for (int x = x0; x <= x1; x++) {
         if (steep) {
-            drawPixel(y, x, color, image); // if transposed, de−transpose
+            drawPixel(y, x, color, image);
         } else {
             drawPixel(x, y, color, image);
+        }
+
+        error2 += derror2;
+        if (error2 > .5) {
+            y += (y1 > y0 ? 1 : -1);
+            error2 -= dx * 2;
         }
     }
 }
@@ -54,10 +73,6 @@ int main(int argc, char** argv) {
     image.width = WINDOW_WIDTH;
     image.height = WINDOW_HEIGHT;
     clearImage(image);
-    //
-
-    u32 red = 255 | (0 << 8) | (0 << 16) | (0 << 24);
-    //
 
     GLuint renderTextureId;
     glGenTextures(1, &renderTextureId);
@@ -97,13 +112,8 @@ int main(int argc, char** argv) {
         // strobe light
         float lastYOffset = (sin(lastY) + 1)/2;
         float midPoint = 50;
-        line(0, lastYOffset * image.height, midPoint, midPoint, image, red);
-        line(midPoint, midPoint, 100, lastYOffset * image.height, image, red);
-        lastY += .1;
-        if (lastY > 100) {
-            lastY = 0;
-        }
-        //
+        line(30, 50, 99, 60, image, RED);
+        line(0, 0, 30, 99, image, WHITE);
 
         glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, image.width, image.height, GL_RGBA, GL_UNSIGNED_BYTE, image.buffer);
 
