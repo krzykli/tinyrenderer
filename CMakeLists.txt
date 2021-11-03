@@ -5,8 +5,11 @@ find_package(OpenGL REQUIRED)
 
 include_directories("/usr/local/Cellar/glfw/3.3.4/include")
 include_directories("/usr/local/Cellar/glew/2.2.0_1/include")
+include_directories("./thirdparty/imgui")
 
-add_executable(tinyrenderer render.h opengl-helpers.h main.cpp)
+file(GLOB RENDERER_SRC *.cpp)
+file(GLOB IMGUI_SRC ./thirdparty/imgui/*.cpp)
+add_executable(tinyrenderer ${IMGUI_SRC} ${RENDERER_SRC})
 
 target_link_libraries(tinyrenderer
     ${OPENGL_LIBRARY}

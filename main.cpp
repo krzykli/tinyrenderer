@@ -8,6 +8,10 @@
 #include <GL/glew.h>
 #include <GLFW/glfw3.h>
 
+#include "thirdparty/imgui/imgui.h"
+#include "thirdparty/imgui/imgui_impl_glfw.h"
+#include "thirdparty/imgui/imgui_impl_opengl3.h"
+
 #include "types.h"
 #include "image.h"
 #include "opengl-helpers.h"
@@ -25,6 +29,7 @@ u32 WHITE = 255 | (255 << 8) | (255 << 16) | (255 << 24);
 
 
 void line(int x0, int y0, int x1, int y1, Image &image, u32 color) { 
+
     bool steep = false;
     if (std::abs(x0 - x1) < std::abs(y0 - y1)) {
         std::swap(x0, y0);
@@ -64,6 +69,16 @@ int main(int argc, char** argv) {
     if (window == NULL)
         return -1;
 
+    IMGUI_CHECKVERSION();
+    ImGui::CreateContext();
+    ImGuiIO& io = ImGui::GetIO(); (void)io;
+
+    ImGui::StyleColorsDark();
+
+    // Setup Platform/Renderer backends
+    ImGui_ImplGlfw_InitForOpenGL(window, true);
+    ImGui_ImplOpenGL3_Init("#version 330");
+
     glClearColor(0.0f, 0.0f, 0.0f, 0.0f);
 
     GLuint renderShaderProgramId = createShader("../shaders/render.vert", "../shaders/render.frag");
@@ -88,6 +103,7 @@ int main(int argc, char** argv) {
     bool lockFramerate = true;
 
     while (!glfwWindowShouldClose(window)) {
+
         currentFrame = glfwGetTime();
         deltaTime = currentFrame - lastFrame;
         float timeInMs = deltaTime * 1000.0f;
@@ -124,12 +140,26 @@ int main(int argc, char** argv) {
         glBindTexture(GL_TEXTURE_2D, 0);
         glEnable(GL_DEPTH_TEST);
 
+        clearImage(image);
+
+        ImGui_ImplOpenGL3_NewFrame();
+        ImGui_ImplGlfw_NewFrame();
+        ImGui::NewFrame();
+        ImGui::ShowDemoWindow();
+        ImGui::Render();
+        ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
+
         glfwSwapBuffers(window);
         glfwPollEvents();
-
-        clearImage(image);
     }
 
+    // Cleanup
     free(image.buffer);
+
+    ImGui_ImplOpenGL3_Shutdown();
+    ImGui_ImplGlfw_Shutdown();
+    ImGui::DestroyContext();
+
+    glfwDestroyWindow(window);
     glfwTerminate();
 }
