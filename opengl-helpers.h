@@ -76,7 +76,7 @@ GLFWwindow* initGLWindow(int width, int height, const char* title) {
     glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE);
 
     window = glfwCreateWindow(width, height, title, NULL, NULL);
-    glfwMaximizeWindow(window);
+    /* glfwMaximizeWindow(window); */
 
     if (!window) {
         glfwTerminate();
