@@ -155,6 +155,10 @@ int main(int argc, char** argv) {
         clearImage(image);
         glClear(GL_COLOR_BUFFER_BIT);
 
+        persist float lineColor[4] = {1.0f, 1.0f, 1.0f, 1.0f};
+
+        u32 lineColorU32 = float4ToU32(lineColor);
+
         for (int i=0; i<model->nfaces(); i++) {
             std::vector<int> face = model->face(i);
             for (int j=0; j<3; j++) {
@@ -164,15 +168,9 @@ int main(int argc, char** argv) {
                 int y0 = (v0.y+1.)*BUFFER_HEIGHT/2.;
                 int x1 = (v1.x+1.)*BUFFER_WIDTH/2.;
                 int y1 = (v1.y+1.)*BUFFER_HEIGHT/2.;
-                drawLine(x0, y0, x1, y1, image, WHITE);
+                drawLine(x0, y0, x1, y1, image, lineColorU32);
             }
         }
-
-        //
-        persist float lineColor[4] = {1.0f, 1.0f, 1.0f, 1.0f};
-
-        u32 lineColorU32 = float4ToU32(lineColor);
-        drawLine(30, 50, 99, 60, image, lineColorU32);
 
         // render
         u8 red = int((sin(glfwGetTime() * 5 / 10.f) + 1) / 2 * 255);
