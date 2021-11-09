@@ -11,14 +11,16 @@
 #include "thirdparty/imgui/imgui.h"
 #include "thirdparty/imgui/imgui_impl_glfw.h"
 #include "thirdparty/imgui/imgui_impl_opengl3.h"
+#include "thirdparty/imguiFileDialog/ImGuiFileDialog.h"
 
 #include "types.h"
 #include "image.h"
 #include "opengl-helpers.h"
 #include "debug.h"
+#include "model.h"
 
-int BUFFER_WIDTH = 100;
-int BUFFER_HEIGHT = 100;
+int BUFFER_WIDTH = 800;
+int BUFFER_HEIGHT = 600;
 
 #define persist static
 
@@ -35,6 +37,7 @@ typedef struct App {
 } App;
 
 App app;
+
 
 persist void drawLadder(int x, int y, int height, int width, Image &image, u32 color) {
     drawLine(x, y, x, y + height, image, color);
@@ -60,8 +63,8 @@ void keyCallback(GLFWwindow* window, int key, int scancode, int action, int mods
 }
 
 void initAppDefaults() {
-    app.resolutionX = BUFFER_WIDTH * 8;
-    app.resolutionY = BUFFER_HEIGHT * 8;
+    app.resolutionX = BUFFER_WIDTH;
+    app.resolutionY = BUFFER_HEIGHT;
     app.isRunning = true;
     app.displayUI = true;
     app.appTitle = "Tiny Renderer";
@@ -83,7 +86,6 @@ void destroyImGui() {
     ImGui_ImplGlfw_Shutdown();
     ImGui::DestroyContext();
 }
-
 
 u32 float4ToU32(float* input) {
     int red = input[0] * 255;
@@ -123,6 +125,9 @@ int main(int argc, char** argv) {
     bool lockFramerate = true;
     char fpsDisplay[12];
 
+    Model* model = new Model("../obj/african_head.obj");
+    print("%i", model->nfaces());
+
     while (!glfwWindowShouldClose(window)) {
 
         currentFrame = glfwGetTime();
@@ -150,9 +155,21 @@ int main(int argc, char** argv) {
         clearImage(image);
         glClear(GL_COLOR_BUFFER_BIT);
 
+        for (int i=0; i<model->nfaces(); i++) {
+            std::vector<int> face = model->face(i);
+            for (int j=0; j<3; j++) {
+                Vec3f v0 = model->vert(face[j]);
+                Vec3f v1 = model->vert(face[(j+1)%3]);
+                int x0 = (v0.x+1.)*BUFFER_WIDTH/2.;
+                int y0 = (v0.y+1.)*BUFFER_HEIGHT/2.;
+                int x1 = (v1.x+1.)*BUFFER_WIDTH/2.;
+                int y1 = (v1.y+1.)*BUFFER_HEIGHT/2.;
+                drawLine(x0, y0, x1, y1, image, WHITE);
+            }
+        }
+
         //
         persist float lineColor[4] = {1.0f, 1.0f, 1.0f, 1.0f};
-
 
         u32 lineColorU32 = float4ToU32(lineColor);
         drawLine(30, 50, 99, 60, image, lineColorU32);
@@ -177,21 +194,38 @@ int main(int argc, char** argv) {
         glUseProgram(renderShaderProgramId);
         glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
 
+
         if (app.displayUI) {
             ImGui_ImplOpenGL3_NewFrame();
             ImGui_ImplGlfw_NewFrame();
             ImGui::NewFrame();
             //
             ImGui::Begin("Settings");
+
+            // file dialog
+            if (ImGui::Button("Open File Dialog"))
+                ImGuiFileDialog::Instance()->OpenDialog("ChooseFileDlgKey", "Choose File", ".obj", ".");
+
+            if (ImGuiFileDialog::Instance()->Display("ChooseFileDlgKey")) 
+            {
+                if (ImGuiFileDialog::Instance()->IsOk())
+                {
+                    std::string filePathName = ImGuiFileDialog::Instance()->GetFilePathName();
+                    free(model);
+
+                    Model* model = new Model(filePathName.c_str());
+                }
+                ImGuiFileDialog::Instance()->Close();
+            }
+
+            // Framerate
             ImGui::Checkbox("Lock Framerate", &lockFramerate);
             sprintf(fpsDisplay, "%lf", FPS);
             ImGui::LabelText("FPS", "%s", fpsDisplay);
-            ImGui::End();
             //
-            ImGui::Begin("Line Color", NULL, ImGuiWindowFlags_AlwaysAutoResize);
             ImGui::ColorEdit3("color", lineColor);
-            ImGui::End();
             //
+            ImGui::End();
             ImGui::EndFrame();
             ImGui::Render();
             ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
@@ -208,6 +242,7 @@ int main(int argc, char** argv) {
 
     // Cleanup
     free(image.buffer);
+    free(model);
     destroyImGui();
 
     glfwDestroyWindow(window);
