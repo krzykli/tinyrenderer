@@ -1,9 +1,9 @@
-#include <stdlib.h>
-#include <stdio.h>
 #include <assert.h>
-#include <stdarg.h>
-#include <string.h>
 #include <cmath>
+#include <stdarg.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
 
 #include <GL/glew.h>
 #include <GLFW/glfw3.h>
@@ -13,11 +13,12 @@
 #include "thirdparty/imgui/imgui_impl_opengl3.h"
 #include "thirdparty/imguiFileDialog/ImGuiFileDialog.h"
 
-#include "types.h"
-#include "image.h"
-#include "opengl-helpers.h"
 #include "debug.h"
+#include "image.h"
 #include "obj-model.h"
+#include "opengl-helpers.h"
+#include "types.h"
+
 
 int BUFFER_WIDTH = 800;
 int BUFFER_HEIGHT = 600;
@@ -130,11 +131,12 @@ int main(int argc, char** argv) {
     bool lockFramerate = true;
     char fpsDisplay[12];
 
-    const char* filePath = "../obj/suzanne.obj";
+    std::string currentFile ("../obj/african_head.obj");
+    std::vector<std::vector<int>> faces;
     std::vector<Vec3f> vertices;
     std::vector<Vec3f> uvs;
     std::vector<Vec3f> normals;
-    loadOBJ(filePath, vertices, uvs, normals);
+    loadOBJ(currentFile.c_str(), faces, vertices, uvs, normals);
 
     while (!glfwWindowShouldClose(window)) {
 
@@ -165,26 +167,24 @@ int main(int argc, char** argv) {
 
         persist float lineColor[4] = {1.0f, 1.0f, 1.0f, 1.0f};
 
+        persist float translation[2] = {2.0f, 2.0f};
+
+        persist float scale = 100;
+
         u32 lineColorU32 = float4ToU32(lineColor);
 
-        for (int i=0; i < vertices.size() - 3; i += 3) {
-            Vec3f v0 = vertices[i];
-            Vec3f v1 = vertices[(i + 1)];
-            int x0 = (v0.x + 2.) * 100;
-            int y0 = (v0.y + 2.) * 100;
-            int x1 = (v1.x + 2.) * 100;
-            int y1 = (v1.y + 2.) * 100;
-            drawLine(x0, y0, x1, y1, image, lineColorU32);
+        for (int i=0; i < faces.size(); i++) {
+            std::vector<int> face = faces[i];
+            for (int j=0; j<3; j++) {
+                Vec3f v0 = vertices[face[j]];
+                Vec3f v1 = vertices[face[(j+1)%3]];
+                int x0 = (v0.x + translation[0]) * scale;
+                int y0 = (v0.y + translation[1]) * scale;
+                int x1 = (v1.x + translation[0]) * scale;
+                int y1 = (v1.y + translation[1]) * scale;
+                drawLine(x0, y0, x1, y1, image, lineColorU32);
+            } 
         }
-
-        // render
-        u8 red = int((sin(glfwGetTime() * 5 / 10.f) + 1) / 2 * 255);
-        u8 green = int((sin(glfwGetTime() * 13 / 10.f) + 1) / 2 * 255);
-        u8 blue = int((sin(glfwGetTime() * 27 / 10.f) + 1) / 2 * 255);
-        u32 variableColor = red | (green << 8) | (blue << 16) | (255 << 24);
-
-        //
-        drawLadder(0, BUFFER_HEIGHT - 20, 20, BUFFER_WIDTH, image, variableColor);
 
         // Draw texture
         glBindTexture(GL_TEXTURE_2D, renderTextureId);
@@ -196,13 +196,11 @@ int main(int argc, char** argv) {
         glUseProgram(renderShaderProgramId);
         glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
 
-
         if (app.displayUI) {
             ImGui_ImplOpenGL3_NewFrame();
             ImGui_ImplGlfw_NewFrame();
             ImGui::NewFrame();
             //
-            ImGui::Begin("Settings");
 
             if(ImGui::BeginMainMenuBar())
             {
@@ -222,24 +220,37 @@ int main(int argc, char** argv) {
             {
                 if (ImGuiFileDialog::Instance()->IsOk())
                 {
-                    std::string filePathName = ImGuiFileDialog::Instance()->GetFilePathName();
+                    currentFile = ImGuiFileDialog::Instance()->GetFilePathName();
+                    faces.clear();
                     vertices.clear();
                     uvs.clear();
                     normals.clear();
 
-                    loadOBJ(filePathName.c_str(), vertices, uvs, normals);
+                    loadOBJ(currentFile.c_str(), faces, vertices, uvs, normals);
                 }
                 ImGuiFileDialog::Instance()->Close();
             }
 
-            // Framerate
-            ImGui::Checkbox("Lock Framerate", &lockFramerate);
-            sprintf(fpsDisplay, "%lf", FPS);
-            ImGui::LabelText("FPS", "%s", fpsDisplay);
-            //
-            ImGui::ColorEdit3("color", lineColor);
-            //
+            ImGui::Begin("TinyRenderer");
+            if (ImGui::CollapsingHeader("Settings")) {
+                ImGui::SliderFloat2("translation", translation, -10, 10.0);
+                ImGui::SliderFloat("scale", &scale, 1, 300.0);
+                ImGui::ColorEdit3("wireframe", lineColor);
+                ImGui::Checkbox("Lock Framerate", &lockFramerate);
+            }
+
+            if (ImGui::CollapsingHeader("Info")) {
+                sprintf(fpsDisplay, "%lf", FPS);
+                ImGui::Text("FPS");
+                ImGui::SameLine();
+                ImGui::Text("%s", fpsDisplay);
+                ImGui::Separator();
+                ImGui::TextWrapped("Model: %s", currentFile.c_str());
+            }
+
             ImGui::End();
+
+
             ImGui::EndFrame();
             ImGui::Render();
             ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());

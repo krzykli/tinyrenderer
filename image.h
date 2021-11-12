@@ -18,7 +18,9 @@ void clearImage(Image &image) {
 }
 
 void drawPixel(u32 x, u32 y, u32 color, Image &image) {
-    image.buffer[x + image.width * y] = color;
+    if (x > 0 && x < image.width - 1 && y > 0 && y < image.height - 1) {
+        image.buffer[x + image.width * y] = color;
+    }
 }
 
 void drawLine(int x0, int y0, int x1, int y1, Image &image, u32 color) {
