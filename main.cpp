@@ -17,7 +17,7 @@
 #include "image.h"
 #include "opengl-helpers.h"
 #include "debug.h"
-#include "model.h"
+#include "obj-model.h"
 
 int BUFFER_WIDTH = 800;
 int BUFFER_HEIGHT = 600;
@@ -42,7 +42,7 @@ App app;
 persist void drawLadder(int x, int y, int height, int width, Image &image, u32 color) {
     drawLine(x, y, x, y + height, image, color);
     for (int i=1; i < height / 2 ; i++) {
-        drawLine(x + 1, i * 2, x + width - 1, i * 2 , image, color);
+        drawLine(x + 1, y + i * 2, x + width - 1, y + i * 2 , image, color);
     }
     drawLine(x + width, y, x + width, y + height, image, color);
 }
@@ -58,6 +58,11 @@ void keyCallback(GLFWwindow* window, int key, int scancode, int action, int mods
 
             case GLFW_KEY_Q:
                 app.isRunning = false;
+                break;
+
+            case GLFW_KEY_O:
+                ImGuiFileDialog::Instance()->OpenDialog("ChooseFileDlgKey", "Choose File", ".obj", ".");
+                break;
         }
     }
 }
@@ -125,8 +130,11 @@ int main(int argc, char** argv) {
     bool lockFramerate = true;
     char fpsDisplay[12];
 
-    Model* model = new Model("../obj/african_head.obj");
-    print("%i", model->nfaces());
+    const char* filePath = "../obj/suzanne.obj";
+    std::vector<Vec3f> vertices;
+    std::vector<Vec3f> uvs;
+    std::vector<Vec3f> normals;
+    loadOBJ(filePath, vertices, uvs, normals);
 
     while (!glfwWindowShouldClose(window)) {
 
@@ -159,17 +167,14 @@ int main(int argc, char** argv) {
 
         u32 lineColorU32 = float4ToU32(lineColor);
 
-        for (int i=0; i<model->nfaces(); i++) {
-            std::vector<int> face = model->face(i);
-            for (int j=0; j<3; j++) {
-                Vec3f v0 = model->vert(face[j]);
-                Vec3f v1 = model->vert(face[(j+1)%3]);
-                int x0 = (v0.x+1.)*BUFFER_WIDTH/2.;
-                int y0 = (v0.y+1.)*BUFFER_HEIGHT/2.;
-                int x1 = (v1.x+1.)*BUFFER_WIDTH/2.;
-                int y1 = (v1.y+1.)*BUFFER_HEIGHT/2.;
-                drawLine(x0, y0, x1, y1, image, lineColorU32);
-            }
+        for (int i=0; i < vertices.size() - 3; i += 3) {
+            Vec3f v0 = vertices[i];
+            Vec3f v1 = vertices[(i + 1)];
+            int x0 = (v0.x + 2.) * 100;
+            int y0 = (v0.y + 2.) * 100;
+            int x1 = (v1.x + 2.) * 100;
+            int y1 = (v1.y + 2.) * 100;
+            drawLine(x0, y0, x1, y1, image, lineColorU32);
         }
 
         // render
@@ -179,8 +184,7 @@ int main(int argc, char** argv) {
         u32 variableColor = red | (green << 8) | (blue << 16) | (255 << 24);
 
         //
-        drawLadder(0, 0, 50, 5, image, variableColor);
-        drawLadder(40, 0, 40, 7, image, variableColor);
+        drawLadder(0, BUFFER_HEIGHT - 20, 20, BUFFER_WIDTH, image, variableColor);
 
         // Draw texture
         glBindTexture(GL_TEXTURE_2D, renderTextureId);
@@ -200,18 +204,30 @@ int main(int argc, char** argv) {
             //
             ImGui::Begin("Settings");
 
-            // file dialog
-            if (ImGui::Button("Open File Dialog"))
-                ImGuiFileDialog::Instance()->OpenDialog("ChooseFileDlgKey", "Choose File", ".obj", ".");
+            if(ImGui::BeginMainMenuBar())
+            {
+                if (ImGui::BeginMenu("File"))
+                {
+                    if(ImGui::MenuItem("Import Obj..."))
+                    {
+                        ImGuiFileDialog::Instance()->OpenDialog("ChooseFileDlgKey", "Choose File", ".obj", ".");
+                    }
+                    ImGui::EndMenu();
+                }
+
+                ImGui::EndMainMenuBar();
+            }
 
             if (ImGuiFileDialog::Instance()->Display("ChooseFileDlgKey")) 
             {
                 if (ImGuiFileDialog::Instance()->IsOk())
                 {
                     std::string filePathName = ImGuiFileDialog::Instance()->GetFilePathName();
-                    free(model);
+                    vertices.clear();
+                    uvs.clear();
+                    normals.clear();
 
-                    Model* model = new Model(filePathName.c_str());
+                    loadOBJ(filePathName.c_str(), vertices, uvs, normals);
                 }
                 ImGuiFileDialog::Instance()->Close();
             }
@@ -240,7 +256,6 @@ int main(int argc, char** argv) {
 
     // Cleanup
     free(image.buffer);
-    free(model);
     destroyImGui();
 
     glfwDestroyWindow(window);
