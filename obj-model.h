@@ -5,7 +5,13 @@
 #include "types.h"
 #include <vector>
 
-bool loadOBJ(const char *path, std::vector<std::vector<int>> &out_faces,
+typedef struct {
+    Vec3f verts[3];
+    Vec3f normals[3];
+    Vec3f uvs[3];
+} Face;
+
+bool loadOBJ(const char *path, std::vector<Face> &out_faces,
              std::vector<Vec3f> &out_vertices, std::vector<Vec3f> &out_uvs,
              std::vector<Vec3f> &out_normals) {
 
@@ -48,7 +54,8 @@ bool loadOBJ(const char *path, std::vector<std::vector<int>> &out_faces,
 
       } else if (secondChar == 'n') {
         Vec3f normal;
-        sscanf(line, "n %f %f %f\n", &normal.x, &normal.y, &normal.z);
+        char *str;
+        sscanf(line, "vn %f %f %f\n", &normal.x, &normal.y, &normal.z);
         out_normals.push_back(normal);
       }
 
@@ -70,14 +77,18 @@ bool loadOBJ(const char *path, std::vector<std::vector<int>> &out_faces,
           return false;
         }
       }
-      float x = --vertexIndex[0]; // indices start with 1
-      float y = --vertexIndex[1];
-      float z = --vertexIndex[2];
 
-      f.push_back(x);
-      f.push_back(y);
-      f.push_back(z);
-      out_faces.push_back(f);
+
+      Face face;
+      face.verts[0] = out_vertices[--vertexIndex[0]];
+      face.verts[1] = out_vertices[--vertexIndex[1]];
+      face.verts[2] = out_vertices[--vertexIndex[2]];
+
+      face.normals[0] = out_normals[--normalIndex[0]];
+      face.normals[1] = out_normals[--normalIndex[1]];
+      face.normals[2] = out_normals[--normalIndex[2]];
+
+      out_faces.push_back(face);
     }
   }
 

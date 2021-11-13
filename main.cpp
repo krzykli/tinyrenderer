@@ -8,6 +8,8 @@
 #include <GL/glew.h>
 #include <GLFW/glfw3.h>
 
+#include <glm/gtx/transform.hpp>
+
 #include "thirdparty/imgui/imgui.h"
 #include "thirdparty/imgui/imgui_impl_glfw.h"
 #include "thirdparty/imgui/imgui_impl_opengl3.h"
@@ -25,28 +27,20 @@ int BUFFER_HEIGHT = 600;
 
 #define persist static
 
-//
 u32 RED = 255 | (0 << 8) | (0 << 16) | (0 << 24);
 u32 WHITE = 255 | (255 << 8) | (255 << 16) | (255 << 24);
-//
+
 typedef struct App {
     int resolutionX;
     int resolutionY;
     bool displayUI;
     bool isRunning;
+    float translateX;
+    float translateY;
     const char* appTitle;
 } App;
 
 App app;
-
-
-persist void drawLadder(int x, int y, int height, int width, Image &image, u32 color) {
-    drawLine(x, y, x, y + height, image, color);
-    for (int i=1; i < height / 2 ; i++) {
-        drawLine(x + 1, y + i * 2, x + width - 1, y + i * 2 , image, color);
-    }
-    drawLine(x + width, y, x + width, y + height, image, color);
-}
 
 void keyCallback(GLFWwindow* window, int key, int scancode, int action, int mods)
 {
@@ -62,8 +56,29 @@ void keyCallback(GLFWwindow* window, int key, int scancode, int action, int mods
                 break;
 
             case GLFW_KEY_O:
-                ImGuiFileDialog::Instance()->OpenDialog("ChooseFileDlgKey", "Choose File", ".obj", ".");
+                ImGuiFileDialog::Instance()->OpenDialog("ChooseFileDlgKey", "Choose File", ".obj", "../obj/");
                 break;
+        }
+    }
+    else {
+        switch (key) {
+
+            case GLFW_KEY_H:
+                app.translateX -= 50;
+                break;
+
+            case GLFW_KEY_L:
+                app.translateX += 50;
+                break;
+
+            case GLFW_KEY_J:
+                app.translateY -= 50;
+                break;
+
+            case GLFW_KEY_K:
+                app.translateY += 50;
+                break;
+
         }
     }
 }
@@ -73,6 +88,8 @@ void initAppDefaults() {
     app.resolutionY = BUFFER_HEIGHT;
     app.isRunning = true;
     app.displayUI = true;
+    app.translateX = 200;
+    app.translateY = 200;
     app.appTitle = "Tiny Renderer";
 }
 
@@ -82,7 +99,6 @@ void initImGui(GLFWwindow* window) {
     ImGuiIO& io = ImGui::GetIO(); (void)io;
     ImGui::StyleColorsDark();
 
-    // Setup Platform/Renderer backends
     ImGui_ImplGlfw_InitForOpenGL(window, true);
     ImGui_ImplOpenGL3_Init("#version 330");
 }
@@ -129,13 +145,16 @@ int main(int argc, char** argv) {
     double lastFrame = currentFrame;
     double deltaTime;
     bool lockFramerate = true;
+    bool turntable = true;
+    float turntableSpeed = 2;
     char fpsDisplay[12];
 
-    std::string currentFile ("../obj/african_head.obj");
-    std::vector<std::vector<int>> faces;
+    std::string currentFile ("../obj/armadillo.obj");
+    std::vector<Face> faces;
     std::vector<Vec3f> vertices;
     std::vector<Vec3f> uvs;
     std::vector<Vec3f> normals;
+
     loadOBJ(currentFile.c_str(), faces, vertices, uvs, normals);
 
     while (!glfwWindowShouldClose(window)) {
@@ -165,25 +184,39 @@ int main(int argc, char** argv) {
         clearImage(image);
         glClear(GL_COLOR_BUFFER_BIT);
 
-        persist float lineColor[4] = {1.0f, 1.0f, 1.0f, 1.0f};
-
-        persist float translation[2] = {2.0f, 2.0f};
-
+        persist float rotateY = 180.0f;
+        if (turntable) {
+            rotateY = rotateY + turntableSpeed;
+            if (rotateY > 360.f) {
+                rotateY = 0;
+            }
+        }
         persist float scale = 100;
 
-        u32 lineColorU32 = float4ToU32(lineColor);
+        for (int i = 0; i < faces.size(); i++) {
+            Face f = faces[i];
+            Vec2i screenCoords[3];
+            glm::mat4 rotation = glm::rotate(glm::radians(rotateY), glm::vec3(0, 1, 0));
 
-        for (int i=0; i < faces.size(); i++) {
-            std::vector<int> face = faces[i];
-            for (int j=0; j<3; j++) {
-                Vec3f v0 = vertices[face[j]];
-                Vec3f v1 = vertices[face[(j+1)%3]];
-                int x0 = (v0.x + translation[0]) * scale;
-                int y0 = (v0.y + translation[1]) * scale;
-                int x1 = (v1.x + translation[0]) * scale;
-                int y1 = (v1.y + translation[1]) * scale;
-                drawLine(x0, y0, x1, y1, image, lineColorU32);
-            } 
+            for (int j = 0; j < 3; j++) {
+                Vec3f v0 = f.verts[j];
+                glm::vec4 vertex = glm::vec4(v0.x, v0.y, v0.z, 1);
+                glm::vec4 rotatedVertex = rotation * vertex;
+                int x = rotatedVertex.x * scale + app.translateX;
+                int y = rotatedVertex.y * scale + app.translateY;
+                screenCoords[j] = { .x = x, .y = y};
+            }
+
+            Vec3f normalA = f.normals[0];
+            Vec3f normalB = f.normals[1];
+            Vec3f normalC = f.normals[2];
+
+            float avNormalX = (normalA.x + normalB.x + normalC.x) / 3;
+            float avNormalY = (normalA.y + normalB.y + normalC.y) / 3;
+            float avNormalZ = (normalA.z + normalB.z + normalC.z) / 3;
+
+            u32 color = int((avNormalX + 1) / 2 * 255) | int((avNormalY + 1) / 2 * 255)  << 8 | int((avNormalZ + 1) / 2 * 255) << 16 | (0 << 24);
+            drawTriangle(screenCoords[0], screenCoords[1], screenCoords[2], image, color);
         }
 
         // Draw texture
@@ -208,7 +241,7 @@ int main(int argc, char** argv) {
                 {
                     if(ImGui::MenuItem("Import Obj..."))
                     {
-                        ImGuiFileDialog::Instance()->OpenDialog("ChooseFileDlgKey", "Choose File", ".obj", ".");
+                        ImGuiFileDialog::Instance()->OpenDialog("ChooseFileDlgKey", "Choose File", ".obj", "../obj/");
                     }
                     ImGui::EndMenu();
                 }
@@ -233,9 +266,14 @@ int main(int argc, char** argv) {
 
             ImGui::Begin("TinyRenderer");
             if (ImGui::CollapsingHeader("Settings")) {
-                ImGui::SliderFloat2("translation", translation, -10, 10.0);
+                ImGui::SliderFloat("translateX", &app.translateX, 0, BUFFER_WIDTH, "%.4f");
+                ImGui::SliderFloat("translateY", &app.translateY, 0, BUFFER_HEIGHT, "%.4f");
+                ImGui::SliderFloat("rotateY", &rotateY, -360, 360);
                 ImGui::SliderFloat("scale", &scale, 1, 300.0);
-                ImGui::ColorEdit3("wireframe", lineColor);
+                ImGui::Separator();
+                ImGui::Checkbox("Turntable", &turntable);
+                ImGui::SliderFloat("Speed", &turntableSpeed, 1, 5);
+                ImGui::Separator();
                 ImGui::Checkbox("Lock Framerate", &lockFramerate);
             }
 
@@ -246,7 +284,15 @@ int main(int argc, char** argv) {
                 ImGui::Text("%s", fpsDisplay);
                 ImGui::Separator();
                 ImGui::TextWrapped("Model: %s", currentFile.c_str());
+                ImGui::TextWrapped("Triangles : %lu", faces.size());
+                ImGui::Separator();
             }
+
+            ImGui::Spacing();
+            ImGui::Text("Keyboard shortcuts:");
+            ImGui::Text("'hjkl': translate");
+            ImGui::Text("'o': open a new file");
+            ImGui::Text("'q': exit");
 
             ImGui::End();
 

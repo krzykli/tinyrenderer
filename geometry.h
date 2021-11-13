@@ -15,8 +15,8 @@ typedef union {
 } Vec3f;
 
 typedef struct Vec2i {
-    int x;
-    int y;
+   float raw[2];
+   struct { int x; int y; };
 } Vec2i;
 
 typedef struct Vec3i {
