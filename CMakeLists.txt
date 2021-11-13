@@ -1,5 +1,6 @@
 project(tinyrenderer)
 set (CMAKE_CXX_STANDARD 11)
+set(CMAKE_BUILD_TYPE Release)
 cmake_minimum_required(VERSION 3.19)
 
 find_package(OpenGL REQUIRED)
@@ -24,7 +25,3 @@ target_link_libraries(tinyrenderer
 
 add_compile_options("-Wall -D")
 
-add_definitions(
-    -DCMAKE_BUILD_TYPE=Debug
-    -DCMAKE_EXPORT_COMPILE_COMMANDS=YES
-)

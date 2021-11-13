@@ -37,6 +37,7 @@ typedef struct App {
     bool isRunning;
     float translateX;
     float translateY;
+    float scale;
     const char* appTitle;
 } App;
 
@@ -79,6 +80,13 @@ void keyCallback(GLFWwindow* window, int key, int scancode, int action, int mods
                 app.translateY += 50;
                 break;
 
+            case GLFW_KEY_UP:
+                app.scale *= 1.1;
+                break;
+
+            case GLFW_KEY_DOWN:
+                app.scale /= 1.1;
+                break;
         }
     }
 }
@@ -90,6 +98,7 @@ void initAppDefaults() {
     app.displayUI = true;
     app.translateX = 200;
     app.translateY = 200;
+    app.scale = 100;
     app.appTitle = "Tiny Renderer";
 }
 
@@ -191,7 +200,6 @@ int main(int argc, char** argv) {
                 rotateY = 0;
             }
         }
-        persist float scale = 100;
 
         for (int i = 0; i < faces.size(); i++) {
             Face f = faces[i];
@@ -202,14 +210,18 @@ int main(int argc, char** argv) {
                 Vec3f v0 = f.verts[j];
                 glm::vec4 vertex = glm::vec4(v0.x, v0.y, v0.z, 1);
                 glm::vec4 rotatedVertex = rotation * vertex;
-                int x = rotatedVertex.x * scale + app.translateX;
-                int y = rotatedVertex.y * scale + app.translateY;
+                int x = rotatedVertex.x * app.scale + app.translateX;
+                int y = rotatedVertex.y * app.scale + app.translateY;
                 screenCoords[j] = { .x = x, .y = y};
             }
 
             Vec3f normalA = f.normals[0];
             Vec3f normalB = f.normals[1];
             Vec3f normalC = f.normals[2];
+
+            Vec3f v0 = f.verts[0];
+            Vec3f v1 = f.verts[1];
+            Vec3f v2 = f.verts[2];
 
             float avNormalX = (normalA.x + normalB.x + normalC.x) / 3;
             float avNormalY = (normalA.y + normalB.y + normalC.y) / 3;
@@ -219,7 +231,6 @@ int main(int argc, char** argv) {
             drawTriangle(screenCoords[0], screenCoords[1], screenCoords[2], image, color);
         }
 
-        // Draw texture
         glBindTexture(GL_TEXTURE_2D, renderTextureId);
         glActiveTexture(GL_TEXTURE0);
         glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
@@ -269,7 +280,7 @@ int main(int argc, char** argv) {
                 ImGui::SliderFloat("translateX", &app.translateX, 0, BUFFER_WIDTH, "%.4f");
                 ImGui::SliderFloat("translateY", &app.translateY, 0, BUFFER_HEIGHT, "%.4f");
                 ImGui::SliderFloat("rotateY", &rotateY, -360, 360);
-                ImGui::SliderFloat("scale", &scale, 1, 300.0);
+                ImGui::SliderFloat("scale", &app.scale, 1, 300.0);
                 ImGui::Separator();
                 ImGui::Checkbox("Turntable", &turntable);
                 ImGui::SliderFloat("Speed", &turntableSpeed, 1, 5);
