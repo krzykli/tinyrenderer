@@ -186,7 +186,7 @@ int main(int argc, char** argv) {
 
         persist float rotateY = 180.0f;
         if (turntable) {
-            rotateY = rotateY + turntableSpeed;
+            rotateY = rotateY + turntableSpeed * deltaTime * 20;
             if (rotateY > 360.f) {
                 rotateY = 0;
             }
