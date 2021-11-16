@@ -32,6 +32,9 @@ int BUFFER_HEIGHT = 600;
 u32 RED = 255 | (0 << 8) | (0 << 16) | (0 << 24);
 u32 WHITE = 255 | (255 << 8) | (255 << 16) | (255 << 24);
 
+enum RenderMode {TRIANGLES = 0, POINTS = 1, NORMALS = 2};
+
+
 typedef struct App {
     int resolutionX;
     int resolutionY;
@@ -40,6 +43,7 @@ typedef struct App {
     float translateX;
     float translateY;
     float scale;
+    RenderMode renderMode;
     const char* appTitle;
 } App;
 
@@ -115,6 +119,7 @@ void initAppDefaults() {
     app.translateY = 200;
     app.scale = 100;
     app.appTitle = "Tiny Renderer";
+    app.renderMode = TRIANGLES;
 }
 
 void initImGui(GLFWwindow* window) {
@@ -226,32 +231,50 @@ int main(int argc, char** argv) {
         for (int i = 0; i < faces.size(); i++) {
             Face f = faces[i];
             Vec2i screenCoords[3];
+
             glm::mat4 rotation = glm::rotate(glm::radians(rotateY), glm::vec3(0, 1, 0));
+            glm::mat4 scale = glm::scale(glm::vec3(app.scale, app.scale, app.scale));
+            glm::mat4 translation = glm::translate(glm::vec3(app.translateX, app.translateY, 0));
+
+            glm::mat4 modelMatrix = translation * scale * rotation;
+
+            glm::vec3 transformedVertices[3];
 
             for (int j = 0; j < 3; j++) {
                 Vec3f v0 = f.verts[j];
                 glm::vec4 vertex = glm::vec4(v0.x, v0.y, v0.z, 1);
-                glm::vec4 rotatedVertex = rotation * vertex;
-                int x = rotatedVertex.x * app.scale + app.translateX;
-                int y = rotatedVertex.y * app.scale + app.translateY;
-                screenCoords[j] = { .x = x, .y = y};
+                glm::vec4 transformedVertex = modelMatrix * vertex;
+                transformedVertices[j] = transformedVertex;
+                screenCoords[j] = { .x = (int)transformedVertex.x, .y = (int)transformedVertex.y};
             }
 
             Vec3f normalA = f.normals[0];
-            Vec3f normalB = f.normals[1];
-            Vec3f normalC = f.normals[2];
+            modelMatrix = translation * rotation;
+            glm::mat4 normalModelMatrix = glm::transpose(glm::inverse(modelMatrix));
+            glm::vec4 normal = glm::vec4(normalA.x, normalA.y, normalA.z, 1);
+            glm::vec4 transformedNormal = normalModelMatrix * normal;
 
-            Vec3f v0 = f.verts[0];
-            Vec3f v1 = f.verts[1];
-            Vec3f v2 = f.verts[2];
+            u32 color = int((normalA.x + 1) / 2 * 255) | int((normalA.y + 1) / 2 * 255)  << 8 | int((normalA.z + 1) / 2 * 255) << 16 | (0 << 24);
 
-            float avNormalX = (normalA.x + normalB.x + normalC.x) / 3;
-            float avNormalY = (normalA.y + normalB.y + normalC.y) / 3;
-            float avNormalZ = (normalA.z + normalB.z + normalC.z) / 3;
+            switch (app.renderMode) {
+                case TRIANGLES:
+                    drawTriangle(screenCoords[0], screenCoords[1], screenCoords[2], image, color);
+                    break;
 
-            u32 color = int((avNormalX + 1) / 2 * 255) | int((avNormalY + 1) / 2 * 255)  << 8 | int((avNormalZ + 1) / 2 * 255) << 16 | (0 << 24);
+                case POINTS:
+                    for (int i=0; i < 3; i++) {
+                        Vec2i coords = screenCoords[i];
+                        drawPixel(coords.x, coords.y, color, image);
+                    }
+                    break;
 
-            drawTriangle(screenCoords[0], screenCoords[1], screenCoords[2], image, color);
+                case NORMALS:
+                    Vec2i normalStart = { .x = int(transformedVertices[0].x + transformedNormal.x), .y = int(transformedVertices[0].y + transformedNormal.y) };
+                    Vec2i normalEnd = { .x = int(transformedVertices[0].x + transformedNormal.x * 10.0f), .y = int(transformedVertices[0].y + transformedNormal.y * 10.0f) };
+                    drawLine(normalStart, normalEnd, image, color);
+                    break;
+            }
+
         }
 
         glBindTexture(GL_TEXTURE_2D, renderTextureId);
@@ -299,11 +322,37 @@ int main(int argc, char** argv) {
             }
 
             ImGui::Begin("TinyRenderer");
+            const char* items[] = { "Triangles", "Points", "Normals" };
+            static const char* current_item = "Triangles";
+
+            if (ImGui::BeginCombo("Render Mode", current_item)) {
+                for (int n = 0; n < IM_ARRAYSIZE(items); n++)
+                {
+                    bool is_selected = (current_item == items[n]);
+                    if (ImGui::Selectable(items[n], is_selected))
+                            current_item = items[n];
+                    if (is_selected)
+                        ImGui::SetItemDefaultFocus();
+                }
+                ImGui::EndCombo();
+            }
+            if (current_item == "Triangles") {
+                app.renderMode = TRIANGLES;
+            }
+            else if (current_item == "Points") {
+                app.renderMode = POINTS;
+            }
+            else if (current_item == "Normals") {
+                app.renderMode = NORMALS;
+            }
             if (ImGui::CollapsingHeader("Settings")) {
+
+                ImGui::Separator();
                 ImGui::SliderFloat("translateX", &app.translateX, 0, BUFFER_WIDTH, "%.4f");
                 ImGui::SliderFloat("translateY", &app.translateY, 0, BUFFER_HEIGHT, "%.4f");
                 ImGui::SliderFloat("rotateY", &rotateY, -360, 360);
                 ImGui::SliderFloat("scale", &app.scale, 1, 300.0);
+
                 ImGui::Separator();
                 ImGui::Checkbox("Turntable", &turntable);
                 ImGui::SliderFloat("Speed", &turntableSpeed, 1, 5);
