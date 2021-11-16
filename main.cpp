@@ -228,15 +228,14 @@ int main(int argc, char** argv) {
             }
         }
 
+        glm::mat4 rotation = glm::rotate(glm::radians(rotateY), glm::vec3(0, 1, 0));
+        glm::mat4 scale = glm::scale(glm::vec3(app.scale, app.scale, app.scale));
+        glm::mat4 translation = glm::translate(glm::vec3(app.translateX, app.translateY, 0));
+        glm::mat4 modelMatrix = translation * scale * rotation;
+
         for (int i = 0; i < faces.size(); i++) {
             Face f = faces[i];
             Vec2i screenCoords[3];
-
-            glm::mat4 rotation = glm::rotate(glm::radians(rotateY), glm::vec3(0, 1, 0));
-            glm::mat4 scale = glm::scale(glm::vec3(app.scale, app.scale, app.scale));
-            glm::mat4 translation = glm::translate(glm::vec3(app.translateX, app.translateY, 0));
-
-            glm::mat4 modelMatrix = translation * scale * rotation;
 
             glm::vec3 transformedVertices[3];
 
@@ -336,13 +335,13 @@ int main(int argc, char** argv) {
                 }
                 ImGui::EndCombo();
             }
-            if (current_item == "Triangles") {
+            if (strcmp(current_item, "Triangles")) {
                 app.renderMode = TRIANGLES;
             }
-            else if (current_item == "Points") {
+            else if (strcmp(current_item, "Points")) {
                 app.renderMode = POINTS;
             }
-            else if (current_item == "Normals") {
+            else if (strcmp(current_item, "Normals")) {
                 app.renderMode = NORMALS;
             }
             if (ImGui::CollapsingHeader("Settings")) {
