@@ -16,6 +16,7 @@ file(GLOB RENDERER_SRC *.cpp)
 file(GLOB IMGUI_SRC ./thirdparty/imgui/*.cpp)
 file(GLOB IMGUIFILEDIALOG_SRC ./thirdparty/imguiFileDialog/*.cpp)
 add_executable(tinyrenderer ${IMGUI_SRC} ${IMGUIFILEDIALOG_SRC} ${RENDERER_SRC})
+add_library(imalive SHARED livelib.cpp)
 
 target_link_libraries(tinyrenderer
     ${OPENGL_LIBRARY}

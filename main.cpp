@@ -15,12 +15,14 @@
 #include "thirdparty/imgui/imgui_impl_opengl3.h"
 #include "thirdparty/imguiFileDialog/ImGuiFileDialog.h"
 
+#define CR_HOST CR_UNSAFE
+#include "cr.h"
+
 #include "debug.h"
 #include "image.h"
 #include "obj-model.h"
 #include "opengl-helpers.h"
 #include "types.h"
-
 
 int BUFFER_WIDTH = 800;
 int BUFFER_HEIGHT = 600;
@@ -42,6 +44,19 @@ typedef struct App {
 } App;
 
 App app;
+
+const char *plugin = CR_PLUGIN("imalive");
+
+struct HostData {
+    int w, h;
+    int display_w, display_h;
+    ImGuiContext *imgui_context = nullptr;
+    void *wndh = nullptr;
+
+    // GLFW input/time data feed to guest
+    double timestep = 0.0;
+    float mouseWheel = 0.0f;
+};
 
 void keyCallback(GLFWwindow* window, int key, int scancode, int action, int mods)
 {
@@ -166,7 +181,12 @@ int main(int argc, char** argv) {
 
     loadOBJ(currentFile.c_str(), faces, vertices, uvs, normals);
 
+    cr_plugin ctx;
+    ctx.userdata = &app;
+    cr_plugin_open(ctx, plugin);
+
     while (!glfwWindowShouldClose(window)) {
+
 
         currentFrame = glfwGetTime();
         deltaTime = currentFrame - lastFrame;
@@ -189,6 +209,8 @@ int main(int argc, char** argv) {
         else {
             FPS = 9999;
         }
+
+        cr_plugin_update(ctx);
 
         clearImage(image);
         glClear(GL_COLOR_BUFFER_BIT);
@@ -228,6 +250,7 @@ int main(int argc, char** argv) {
             float avNormalZ = (normalA.z + normalB.z + normalC.z) / 3;
 
             u32 color = int((avNormalX + 1) / 2 * 255) | int((avNormalY + 1) / 2 * 255)  << 8 | int((avNormalZ + 1) / 2 * 255) << 16 | (0 << 24);
+
             drawTriangle(screenCoords[0], screenCoords[1], screenCoords[2], image, color);
         }
 
@@ -321,6 +344,8 @@ int main(int argc, char** argv) {
             break;
         }
     }
+
+    cr_plugin_close(ctx);
 
     // Cleanup
     free(image.buffer);
