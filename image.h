@@ -5,17 +5,6 @@
 #include <glm/gtx/transform.hpp>
 #include <stdlib.h>
 
-typedef struct Image {
-    u32 *buffer;
-    u32 width;
-    u32 height;
-} Image;
-
-void clearImage(Image &image) {
-    for (int i = 0; i < image.width * image.height; i++) {
-        image.buffer[i] = 0;
-    }
-}
 
 void drawPixel(u32 x, u32 y, u32 color, Image &image) {
     if (x > 0 && x < image.width - 1 && y > 0 && y < image.height - 1) {

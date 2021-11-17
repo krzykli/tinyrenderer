@@ -5,11 +5,6 @@
 #include <glm/gtx/transform.hpp>
 #include <vector>
 
-typedef struct {
-  glm::vec3 verts[3];
-  glm::vec3 normals[3];
-  glm::vec3 uvs[3];
-} Face;
 
 bool loadOBJ(const char *path, std::vector<Face> &out_faces,
              std::vector<glm::vec3> &out_vertices,

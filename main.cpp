@@ -18,39 +18,27 @@
 #define CR_HOST CR_UNSAFE
 #include "cr.h"
 
+#include "app.h"
 #include "debug.h"
-#include "image.h"
 #include "obj-model.h"
 #include "opengl-helpers.h"
 #include "types.h"
 
+App app;
+
 int BUFFER_WIDTH = 1280;
 int BUFFER_HEIGHT = 920;
-
-#define persist static
 
 u32 RED = 255 | (0 << 8) | (0 << 16) | (0 << 24);
 u32 WHITE = 255 | (255 << 8) | (255 << 16) | (255 << 24);
 
-enum RenderMode { TRIANGLES = 0, POINTS = 1, NORMALS = 2 };
-
-typedef struct App {
-    int resolutionX;
-    int resolutionY;
-    bool displayUI;
-    bool isRunning;
-    RenderMode renderMode;
-
-    float translateX;
-    float translateY;
-    float scale;
-
-    const char *appTitle;
-} App;
-
-App app;
-
 const char *plugin = CR_PLUGIN("imalive");
+
+void clearImage(Image &image) {
+    for (int i = 0; i < image.width * image.height; i++) {
+        image.buffer[i] = 0;
+    }
+}
 
 struct HostData {
     int w, h;
@@ -67,6 +55,7 @@ void keyCallback(GLFWwindow *window, int key, int scancode, int action, int mods
     if (action == GLFW_PRESS) {
 
         switch (key) {
+
         case GLFW_KEY_SPACE:
             app.displayUI = !app.displayUI;
             break;
@@ -115,9 +104,14 @@ void initAppDefaults() {
     app.resolutionY = BUFFER_HEIGHT;
     app.isRunning = true;
     app.displayUI = true;
+
     app.translateX = 400;
     app.translateY = 400;
     app.scale = 150;
+
+    app.turntable = true;
+    app.turntableSpeed = 2;
+
     app.appTitle = "Tiny Renderer";
     app.renderMode = TRIANGLES;
 }
@@ -161,32 +155,23 @@ int main(int argc, char **argv) {
 
     GLuint renderShaderProgramId = createShader("../shaders/render.vert", "../shaders/render.frag");
 
-    Image image;
-    image.buffer = (u32 *)malloc(BUFFER_WIDTH * BUFFER_HEIGHT * sizeof(u32));
-    image.width = BUFFER_WIDTH;
-    image.height = BUFFER_HEIGHT;
+    app.image.buffer = (u32 *)malloc(BUFFER_WIDTH * BUFFER_HEIGHT * sizeof(u32));
+    app.image.width = BUFFER_WIDTH;
+    app.image.height = BUFFER_HEIGHT;
 
     GLuint renderTextureId;
     glGenTextures(1, &renderTextureId);
 
     GLuint renderVAO =
-        initTextureRender(image.width, image.height, renderTextureId, renderShaderProgramId);
+        initTextureRender(app.image.width, app.image.height, renderTextureId, renderShaderProgramId);
 
     double currentFrame = glfwGetTime();
     double lastFrame = currentFrame;
-    double deltaTime;
     bool lockFramerate = true;
-    bool turntable = true;
-    float turntableSpeed = 2;
     char fpsDisplay[12];
 
     std::string currentFile("../obj/armadillo.obj");
-    std::vector<Face> faces;
-    std::vector<glm::vec3> vertices;
-    std::vector<glm::vec3> uvs;
-    std::vector<glm::vec3> normals;
-
-    loadOBJ(currentFile.c_str(), faces, vertices, uvs, normals);
+    loadOBJ(currentFile.c_str(), app.modelData.faces, app.modelData.vertices, app.modelData.uvs, app.modelData.normals);
 
     cr_plugin ctx;
     ctx.userdata = &app;
@@ -195,100 +180,40 @@ int main(int argc, char **argv) {
     while (!glfwWindowShouldClose(window)) {
 
         currentFrame = glfwGetTime();
-        deltaTime = currentFrame - lastFrame;
+        app.deltaTime = currentFrame - lastFrame;
 
-        double timeInMs = deltaTime * 1000.0f;
+        double timeInMs = app.deltaTime * 1000.0f;
         double FPS;
 
         if (lockFramerate) {
             while (timeInMs < 16.666666f) {
                 currentFrame = glfwGetTime();
-                deltaTime = currentFrame - lastFrame;
-                timeInMs = deltaTime * 1000.0f;
+                app.deltaTime = currentFrame - lastFrame;
+                timeInMs = app.deltaTime * 1000.0f;
             }
         }
         lastFrame = currentFrame;
-        if (deltaTime > 0.0001) {
-            FPS = 1 / deltaTime;
+        if (app.deltaTime > 0.0001) {
+            FPS = 1 / app.deltaTime;
         } else {
             FPS = 9999;
         }
 
-        cr_plugin_update(ctx);
+        cr_plugin_update(ctx); // render
 
-        clearImage(image);
         glClear(GL_COLOR_BUFFER_BIT);
-
-        persist float rotateY = 180.0f;
-        if (turntable) {
-            rotateY = rotateY + turntableSpeed * deltaTime * 20;
-            if (rotateY > 360.f) {
-                rotateY = 0;
-            }
-        }
-
-        for (int i = 0; i < faces.size(); i++) {
-            Face f = faces[i];
-            glm::vec2 screenCoords[3];
-
-            glm::mat4 rotation = glm::rotate(glm::radians(rotateY), glm::vec3(0, 1, 0));
-            glm::mat4 scale = glm::scale(glm::vec3(app.scale, app.scale, app.scale));
-            glm::mat4 translation = glm::translate(glm::vec3(app.translateX, app.translateY, 0));
-
-            glm::mat4 modelMatrix = translation * scale * rotation;
-
-            glm::vec3 transformedVertices[3];
-
-            for (int j = 0; j < 3; j++) {
-                glm::vec3 v0 = f.verts[j];
-                glm::vec4 vertex = glm::vec4(v0.x, v0.y, v0.z, 1);
-                glm::vec4 transformedVertex = modelMatrix * vertex;
-                transformedVertices[j] = transformedVertex;
-                screenCoords[j] = glm::vec2((int)transformedVertex.x, (int)transformedVertex.y);
-            }
-
-            glm::vec3 normalA = f.normals[0];
-            modelMatrix = translation * rotation;
-            glm::mat4 normalModelMatrix = glm::transpose(glm::inverse(modelMatrix));
-            glm::vec4 normal = glm::vec4(normalA.x, normalA.y, normalA.z, 1);
-            glm::vec4 transformedNormal = normalModelMatrix * normal;
-
-            u32 color = int((normalA.x + 1) / 2 * 255) | int((normalA.y + 1) / 2 * 255) << 8 |
-                        int((normalA.z + 1) / 2 * 255) << 16 | (0 << 24);
-
-            switch (app.renderMode) {
-            case TRIANGLES:
-                drawTriangle(screenCoords[0], screenCoords[1], screenCoords[2], image, color);
-                break;
-
-            case POINTS:
-                for (int i = 0; i < 3; i++) {
-                    glm::vec2 coords = screenCoords[i];
-                    drawPixel(coords.x, coords.y, color, image);
-                }
-                break;
-
-            case NORMALS:
-                glm::vec2 normalStart =
-                    glm::vec2(int(transformedVertices[0].x + transformedNormal.x),
-                              int(transformedVertices[0].y + transformedNormal.y));
-                glm::vec2 normalEnd =
-                    glm::vec2(int(transformedVertices[0].x + transformedNormal.x * 10.0f),
-                              int(transformedVertices[0].y + transformedNormal.y * 10.0f));
-                drawLine(normalStart, normalEnd, image, color);
-                break;
-            }
-        }
 
         glBindTexture(GL_TEXTURE_2D, renderTextureId);
         glActiveTexture(GL_TEXTURE0);
         glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-        glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, image.width, image.height, GL_RGBA,
-                        GL_UNSIGNED_BYTE, image.buffer);
+        glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, app.image.width, app.image.height, GL_RGBA,
+                        GL_UNSIGNED_BYTE, app.image.buffer);
 
         glBindVertexArray(renderVAO);
         glUseProgram(renderShaderProgramId);
         glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
+
+        clearImage(app.image);
 
         if (app.displayUI) {
             ImGui_ImplOpenGL3_NewFrame();
@@ -311,12 +236,13 @@ int main(int argc, char **argv) {
             if (ImGuiFileDialog::Instance()->Display("ChooseFileDlgKey")) {
                 if (ImGuiFileDialog::Instance()->IsOk()) {
                     currentFile = ImGuiFileDialog::Instance()->GetFilePathName();
-                    faces.clear();
-                    vertices.clear();
-                    uvs.clear();
-                    normals.clear();
+                    app.modelData.faces.clear();
+                    app.modelData.vertices.clear();
+                    app.modelData.uvs.clear();
+                    app.modelData.normals.clear();
 
-                    loadOBJ(currentFile.c_str(), faces, vertices, uvs, normals);
+                    loadOBJ(currentFile.c_str(), app.modelData.faces, app.modelData.vertices,
+                            app.modelData.uvs, app.modelData.normals);
                 }
                 ImGuiFileDialog::Instance()->Close();
             }
@@ -347,12 +273,12 @@ int main(int argc, char **argv) {
                 ImGui::Separator();
                 ImGui::SliderFloat("translateX", &app.translateX, 0, BUFFER_WIDTH, "%.4f");
                 ImGui::SliderFloat("translateY", &app.translateY, 0, BUFFER_HEIGHT, "%.4f");
-                ImGui::SliderFloat("rotateY", &rotateY, -360, 360);
+                ImGui::SliderFloat("rotateY", &app.rotateY, -360, 360);
                 ImGui::SliderFloat("scale", &app.scale, 1, 300.0);
 
                 ImGui::Separator();
-                ImGui::Checkbox("Turntable", &turntable);
-                ImGui::SliderFloat("Speed", &turntableSpeed, 1, 5);
+                ImGui::Checkbox("Turntable", &app.turntable);
+                ImGui::SliderFloat("Speed", &app.turntableSpeed, 1, 5);
                 ImGui::Separator();
                 ImGui::Checkbox("Lock Framerate", &lockFramerate);
             }
@@ -364,7 +290,7 @@ int main(int argc, char **argv) {
                 ImGui::Text("%s", fpsDisplay);
                 ImGui::Separator();
                 ImGui::TextWrapped("Model: %s", currentFile.c_str());
-                ImGui::TextWrapped("Triangles : %lu", faces.size());
+                ImGui::TextWrapped("Triangles : %lu", app.modelData.faces.size());
                 ImGui::Separator();
             }
 
@@ -393,7 +319,7 @@ int main(int argc, char **argv) {
     cr_plugin_close(ctx);
 
     // Cleanup
-    free(image.buffer);
+    free(app.image.buffer);
     destroyImGui();
 
     glfwDestroyWindow(window);
