@@ -32,8 +32,7 @@ int BUFFER_HEIGHT = 920;
 u32 RED = 255 | (0 << 8) | (0 << 16) | (0 << 24);
 u32 WHITE = 255 | (255 << 8) | (255 << 16) | (255 << 24);
 
-enum RenderMode {TRIANGLES = 0, POINTS = 1, NORMALS = 2};
-
+enum RenderMode { TRIANGLES = 0, POINTS = 1, NORMALS = 2 };
 
 typedef struct App {
     int resolutionX;
@@ -46,7 +45,7 @@ typedef struct App {
     float translateY;
     float scale;
 
-    const char* appTitle;
+    const char *appTitle;
 } App;
 
 App app;
@@ -64,50 +63,49 @@ struct HostData {
     float mouseWheel = 0.0f;
 };
 
-void keyCallback(GLFWwindow* window, int key, int scancode, int action, int mods)
-{
+void keyCallback(GLFWwindow *window, int key, int scancode, int action, int mods) {
     if (action == GLFW_PRESS) {
 
         switch (key) {
-            case GLFW_KEY_SPACE:
-                app.displayUI = !app.displayUI;
-                break;
+        case GLFW_KEY_SPACE:
+            app.displayUI = !app.displayUI;
+            break;
 
-            case GLFW_KEY_Q:
-                app.isRunning = false;
-                break;
+        case GLFW_KEY_Q:
+            app.isRunning = false;
+            break;
 
-            case GLFW_KEY_O:
-                ImGuiFileDialog::Instance()->OpenDialog("ChooseFileDlgKey", "Choose File", ".obj", "../obj/");
-                break;
+        case GLFW_KEY_O:
+            ImGuiFileDialog::Instance()->OpenDialog("ChooseFileDlgKey", "Choose File", ".obj",
+                                                    "../obj/");
+            break;
         }
-    }
-    else {
+    } else {
         switch (key) {
 
-            case GLFW_KEY_H:
-                app.translateX -= 50;
-                break;
+        case GLFW_KEY_H:
+            app.translateX -= 50;
+            break;
 
-            case GLFW_KEY_L:
-                app.translateX += 50;
-                break;
+        case GLFW_KEY_L:
+            app.translateX += 50;
+            break;
 
-            case GLFW_KEY_J:
-                app.translateY -= 50;
-                break;
+        case GLFW_KEY_J:
+            app.translateY -= 50;
+            break;
 
-            case GLFW_KEY_K:
-                app.translateY += 50;
-                break;
+        case GLFW_KEY_K:
+            app.translateY += 50;
+            break;
 
-            case GLFW_KEY_UP:
-                app.scale *= 1.1;
-                break;
+        case GLFW_KEY_UP:
+            app.scale *= 1.1;
+            break;
 
-            case GLFW_KEY_DOWN:
-                app.scale /= 1.1;
-                break;
+        case GLFW_KEY_DOWN:
+            app.scale /= 1.1;
+            break;
         }
     }
 }
@@ -124,10 +122,11 @@ void initAppDefaults() {
     app.renderMode = TRIANGLES;
 }
 
-void initImGui(GLFWwindow* window) {
+void initImGui(GLFWwindow *window) {
     IMGUI_CHECKVERSION();
     ImGui::CreateContext();
-    ImGuiIO& io = ImGui::GetIO(); (void)io;
+    ImGuiIO &io = ImGui::GetIO();
+    (void)io;
     ImGui::StyleColorsDark();
 
     ImGui_ImplGlfw_InitForOpenGL(window, true);
@@ -140,7 +139,7 @@ void destroyImGui() {
     ImGui::DestroyContext();
 }
 
-u32 float4ToU32(float* input) {
+u32 float4ToU32(float *input) {
     int red = input[0] * 255;
     int green = input[1] * 255;
     int blue = input[2] * 255;
@@ -149,9 +148,9 @@ u32 float4ToU32(float* input) {
     return output;
 }
 
-int main(int argc, char** argv) {
+int main(int argc, char **argv) {
     initAppDefaults();
-    GLFWwindow* window = initGLWindow(app.resolutionX, app.resolutionY, app.appTitle);
+    GLFWwindow *window = initGLWindow(app.resolutionX, app.resolutionY, app.appTitle);
     if (window == NULL)
         return -1;
 
@@ -163,14 +162,15 @@ int main(int argc, char** argv) {
     GLuint renderShaderProgramId = createShader("../shaders/render.vert", "../shaders/render.frag");
 
     Image image;
-    image.buffer = (u32*)malloc(BUFFER_WIDTH * BUFFER_HEIGHT * sizeof(u32));
+    image.buffer = (u32 *)malloc(BUFFER_WIDTH * BUFFER_HEIGHT * sizeof(u32));
     image.width = BUFFER_WIDTH;
     image.height = BUFFER_HEIGHT;
 
     GLuint renderTextureId;
     glGenTextures(1, &renderTextureId);
 
-    GLuint renderVAO = initTextureRender(image.width, image.height, renderTextureId, renderShaderProgramId);
+    GLuint renderVAO =
+        initTextureRender(image.width, image.height, renderTextureId, renderShaderProgramId);
 
     double currentFrame = glfwGetTime();
     double lastFrame = currentFrame;
@@ -180,7 +180,7 @@ int main(int argc, char** argv) {
     float turntableSpeed = 2;
     char fpsDisplay[12];
 
-    std::string currentFile ("../obj/armadillo.obj");
+    std::string currentFile("../obj/armadillo.obj");
     std::vector<Face> faces;
     std::vector<glm::vec3> vertices;
     std::vector<glm::vec3> uvs;
@@ -194,7 +194,6 @@ int main(int argc, char** argv) {
 
     while (!glfwWindowShouldClose(window)) {
 
-
         currentFrame = glfwGetTime();
         deltaTime = currentFrame - lastFrame;
 
@@ -202,8 +201,7 @@ int main(int argc, char** argv) {
         double FPS;
 
         if (lockFramerate) {
-            while (timeInMs < 16.666666f)
-            {
+            while (timeInMs < 16.666666f) {
                 currentFrame = glfwGetTime();
                 deltaTime = currentFrame - lastFrame;
                 timeInMs = deltaTime * 1000.0f;
@@ -212,8 +210,7 @@ int main(int argc, char** argv) {
         lastFrame = currentFrame;
         if (deltaTime > 0.0001) {
             FPS = 1 / deltaTime;
-        }
-        else {
+        } else {
             FPS = 9999;
         }
 
@@ -256,33 +253,38 @@ int main(int argc, char** argv) {
             glm::vec4 normal = glm::vec4(normalA.x, normalA.y, normalA.z, 1);
             glm::vec4 transformedNormal = normalModelMatrix * normal;
 
-            u32 color = int((normalA.x + 1) / 2 * 255) | int((normalA.y + 1) / 2 * 255)  << 8 | int((normalA.z + 1) / 2 * 255) << 16 | (0 << 24);
+            u32 color = int((normalA.x + 1) / 2 * 255) | int((normalA.y + 1) / 2 * 255) << 8 |
+                        int((normalA.z + 1) / 2 * 255) << 16 | (0 << 24);
 
             switch (app.renderMode) {
-                case TRIANGLES:
-                    drawTriangle(screenCoords[0], screenCoords[1], screenCoords[2], image, color);
-                    break;
+            case TRIANGLES:
+                drawTriangle(screenCoords[0], screenCoords[1], screenCoords[2], image, color);
+                break;
 
-                case POINTS:
-                    for (int i=0; i < 3; i++) {
-                        glm::vec2 coords = screenCoords[i];
-                        drawPixel(coords.x, coords.y, color, image);
-                    }
-                    break;
+            case POINTS:
+                for (int i = 0; i < 3; i++) {
+                    glm::vec2 coords = screenCoords[i];
+                    drawPixel(coords.x, coords.y, color, image);
+                }
+                break;
 
-                case NORMALS:
-                    glm::vec2 normalStart = glm::vec2( int(transformedVertices[0].x + transformedNormal.x), int(transformedVertices[0].y + transformedNormal.y) );
-                    glm::vec2 normalEnd = glm::vec2( int(transformedVertices[0].x + transformedNormal.x * 10.0f), int(transformedVertices[0].y + transformedNormal.y * 10.0f) );
-                    drawLine(normalStart, normalEnd, image, color);
-                    break;
+            case NORMALS:
+                glm::vec2 normalStart =
+                    glm::vec2(int(transformedVertices[0].x + transformedNormal.x),
+                              int(transformedVertices[0].y + transformedNormal.y));
+                glm::vec2 normalEnd =
+                    glm::vec2(int(transformedVertices[0].x + transformedNormal.x * 10.0f),
+                              int(transformedVertices[0].y + transformedNormal.y * 10.0f));
+                drawLine(normalStart, normalEnd, image, color);
+                break;
             }
-
         }
 
         glBindTexture(GL_TEXTURE_2D, renderTextureId);
         glActiveTexture(GL_TEXTURE0);
         glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-        glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, image.width, image.height, GL_RGBA, GL_UNSIGNED_BYTE, image.buffer);
+        glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, image.width, image.height, GL_RGBA,
+                        GL_UNSIGNED_BYTE, image.buffer);
 
         glBindVertexArray(renderVAO);
         glUseProgram(renderShaderProgramId);
@@ -294,13 +296,11 @@ int main(int argc, char** argv) {
             ImGui::NewFrame();
             //
 
-            if(ImGui::BeginMainMenuBar())
-            {
-                if (ImGui::BeginMenu("File"))
-                {
-                    if(ImGui::MenuItem("Import Obj..."))
-                    {
-                        ImGuiFileDialog::Instance()->OpenDialog("ChooseFileDlgKey", "Choose File", ".obj", "../obj/");
+            if (ImGui::BeginMainMenuBar()) {
+                if (ImGui::BeginMenu("File")) {
+                    if (ImGui::MenuItem("Import Obj...")) {
+                        ImGuiFileDialog::Instance()->OpenDialog("ChooseFileDlgKey", "Choose File",
+                                                                ".obj", "../obj/");
                     }
                     ImGui::EndMenu();
                 }
@@ -308,10 +308,8 @@ int main(int argc, char** argv) {
                 ImGui::EndMainMenuBar();
             }
 
-            if (ImGuiFileDialog::Instance()->Display("ChooseFileDlgKey")) 
-            {
-                if (ImGuiFileDialog::Instance()->IsOk())
-                {
+            if (ImGuiFileDialog::Instance()->Display("ChooseFileDlgKey")) {
+                if (ImGuiFileDialog::Instance()->IsOk()) {
                     currentFile = ImGuiFileDialog::Instance()->GetFilePathName();
                     faces.clear();
                     vertices.clear();
@@ -324,15 +322,14 @@ int main(int argc, char** argv) {
             }
 
             ImGui::Begin("TinyRenderer");
-            const char* items[] = { "Triangles", "Points", "Normals" };
-            static const char* current_item = "Triangles";
+            const char *items[] = {"Triangles", "Points", "Normals"};
+            static const char *current_item = "Triangles";
 
             if (ImGui::BeginCombo("Render Mode", current_item)) {
-                for (int n = 0; n < IM_ARRAYSIZE(items); n++)
-                {
+                for (int n = 0; n < IM_ARRAYSIZE(items); n++) {
                     bool is_selected = (current_item == items[n]);
                     if (ImGui::Selectable(items[n], is_selected))
-                            current_item = items[n];
+                        current_item = items[n];
                     if (is_selected)
                         ImGui::SetItemDefaultFocus();
                 }
@@ -340,11 +337,9 @@ int main(int argc, char** argv) {
             }
             if (current_item == "Triangles") {
                 app.renderMode = TRIANGLES;
-            }
-            else if (current_item == "Points") {
+            } else if (current_item == "Points") {
                 app.renderMode = POINTS;
-            }
-            else if (current_item == "Normals") {
+            } else if (current_item == "Normals") {
                 app.renderMode = NORMALS;
             }
             if (ImGui::CollapsingHeader("Settings")) {
@@ -380,7 +375,6 @@ int main(int argc, char** argv) {
             ImGui::Text("'q': exit");
 
             ImGui::End();
-
 
             ImGui::EndFrame();
             ImGui::Render();
