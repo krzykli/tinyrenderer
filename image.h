@@ -1,19 +1,18 @@
-#ifndef IMAGEH
-#define IMAGEH
+#ifndef __IMAGE_H__
+#define __IMAGE_H__
 
-#include <stdlib.h>
 #include "types.h"
-#include "geometry.h"
+#include <glm/gtx/transform.hpp>
+#include <stdlib.h>
 
-typedef struct Image
-{
-    u32* buffer;
+typedef struct Image {
+    u32 *buffer;
     u32 width;
     u32 height;
 } Image;
 
 void clearImage(Image &image) {
-    for (int i=0; i < image.width * image.height; i++) {
+    for (int i = 0; i < image.width * image.height; i++) {
         image.buffer[i] = 0;
     }
 }
@@ -24,7 +23,7 @@ void drawPixel(u32 x, u32 y, u32 color, Image &image) {
     }
 }
 
-void drawLine(Vec2i v0, Vec2i v1, Image &image, u32 color) {
+void drawLine(glm::vec2 v0, glm::vec2 v1, Image &image, u32 color) {
 
     int x0 = v0.x;
     int y0 = v0.y;
@@ -66,23 +65,15 @@ void drawLine(Vec2i v0, Vec2i v1, Image &image, u32 color) {
     }
 }
 
+int imin(int a, int b) { return (a < b) ? a : b; }
 
-int imin(int a, int b)
-{
-  return (a < b) ? a : b;
-}
+int imax(int a, int b) { return (a > b) ? a : b; }
 
-int imax(int a, int b)
-{
-  return (a > b) ? a : b;
-}
-
-bool edgeFunction(Vec2i &a, Vec2i &b, Vec2i &c)
-{
+bool edgeFunction(glm::vec2 &a, glm::vec2 &b, glm::vec2 &c) {
     return ((c.x - a.x) * (b.y - a.y) - (c.y - a.y) * (b.x - a.x) >= 0);
 }
 
-void drawTriangle(Vec2i t0, Vec2i t1, Vec2i t2, Image &image, u32 color) {
+void drawTriangle(glm::vec2 t0, glm::vec2 t1, glm::vec2 t2, Image &image, u32 color) {
     int minX = imin(imin(t0.x, t1.x), t2.x);
     int maxX = imax(imax(t0.x, t1.x), t2.x);
 
@@ -92,7 +83,7 @@ void drawTriangle(Vec2i t0, Vec2i t1, Vec2i t2, Image &image, u32 color) {
     for (int x = minX; x < maxX; x++) {
         for (int y = minY; y < maxY; y++) {
 
-            Vec2i p = { .x = x, .y = y };
+            glm::vec2 p(x, y);
             bool insideEdgeA = edgeFunction(t1, t2, p);
             bool insideEdgeB = edgeFunction(t2, t0, p);
             bool insideEdgeC = edgeFunction(t0, t1, p);
@@ -104,4 +95,4 @@ void drawTriangle(Vec2i t0, Vec2i t1, Vec2i t2, Image &image, u32 color) {
     }
 }
 
-#endif // IMAGEH
+#endif // __IMAGE_H_

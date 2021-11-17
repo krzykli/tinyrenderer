@@ -1,19 +1,20 @@
 #ifndef __OBJ_MODEL_H__
 #define __OBJ_MODEL_H__
 
-#include "geometry.h"
 #include "types.h"
+#include <glm/gtx/transform.hpp>
 #include <vector>
 
 typedef struct {
-    Vec3f verts[3];
-    Vec3f normals[3];
-    Vec3f uvs[3];
+  glm::vec3 verts[3];
+  glm::vec3 normals[3];
+  glm::vec3 uvs[3];
 } Face;
 
 bool loadOBJ(const char *path, std::vector<Face> &out_faces,
-             std::vector<Vec3f> &out_vertices, std::vector<Vec3f> &out_uvs,
-             std::vector<Vec3f> &out_normals) {
+             std::vector<glm::vec3> &out_vertices,
+             std::vector<glm::vec3> &out_uvs,
+             std::vector<glm::vec3> &out_normals) {
 
   printf("Loading OBJ file %s...\n", path);
 
@@ -40,12 +41,12 @@ bool loadOBJ(const char *path, std::vector<Face> &out_faces,
     if (dataType == 'v') {
       char secondChar = line[1];
       if (secondChar == ' ') {
-        Vec3f vertex;
+        glm::vec3 vertex;
         sscanf(line, "v %f %f %f\n", &vertex.x, &vertex.y, &vertex.z);
         out_vertices.push_back(vertex);
 
       } else if (secondChar == 't') {
-        Vec3f uv;
+        glm::vec3 uv;
         sscanf(line, "vt %f %f\n", &uv.x, &uv.y);
         uv.y = -uv.y; // Invert V coordinate since we will only use DDS texture,
                       // which are inverted. Remove if you want to use TGA or
@@ -53,7 +54,7 @@ bool loadOBJ(const char *path, std::vector<Face> &out_faces,
         out_uvs.push_back(uv);
 
       } else if (secondChar == 'n') {
-        Vec3f normal;
+        glm::vec3 normal;
         char *str;
         sscanf(line, "vn %f %f %f\n", &normal.x, &normal.y, &normal.z);
         out_normals.push_back(normal);
@@ -77,7 +78,6 @@ bool loadOBJ(const char *path, std::vector<Face> &out_faces,
           return false;
         }
       }
-
 
       Face face;
       face.verts[0] = out_vertices[--vertexIndex[0]];

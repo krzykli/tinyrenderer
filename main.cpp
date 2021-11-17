@@ -24,8 +24,8 @@
 #include "opengl-helpers.h"
 #include "types.h"
 
-int BUFFER_WIDTH = 800;
-int BUFFER_HEIGHT = 600;
+int BUFFER_WIDTH = 1280;
+int BUFFER_HEIGHT = 920;
 
 #define persist static
 
@@ -40,10 +40,12 @@ typedef struct App {
     int resolutionY;
     bool displayUI;
     bool isRunning;
+    RenderMode renderMode;
+
     float translateX;
     float translateY;
     float scale;
-    RenderMode renderMode;
+
     const char* appTitle;
 } App;
 
@@ -115,9 +117,9 @@ void initAppDefaults() {
     app.resolutionY = BUFFER_HEIGHT;
     app.isRunning = true;
     app.displayUI = true;
-    app.translateX = 200;
-    app.translateY = 200;
-    app.scale = 100;
+    app.translateX = 400;
+    app.translateY = 400;
+    app.scale = 150;
     app.appTitle = "Tiny Renderer";
     app.renderMode = TRIANGLES;
 }
@@ -180,9 +182,9 @@ int main(int argc, char** argv) {
 
     std::string currentFile ("../obj/armadillo.obj");
     std::vector<Face> faces;
-    std::vector<Vec3f> vertices;
-    std::vector<Vec3f> uvs;
-    std::vector<Vec3f> normals;
+    std::vector<glm::vec3> vertices;
+    std::vector<glm::vec3> uvs;
+    std::vector<glm::vec3> normals;
 
     loadOBJ(currentFile.c_str(), faces, vertices, uvs, normals);
 
@@ -230,7 +232,7 @@ int main(int argc, char** argv) {
 
         for (int i = 0; i < faces.size(); i++) {
             Face f = faces[i];
-            Vec2i screenCoords[3];
+            glm::vec2 screenCoords[3];
 
             glm::mat4 rotation = glm::rotate(glm::radians(rotateY), glm::vec3(0, 1, 0));
             glm::mat4 scale = glm::scale(glm::vec3(app.scale, app.scale, app.scale));
@@ -241,14 +243,14 @@ int main(int argc, char** argv) {
             glm::vec3 transformedVertices[3];
 
             for (int j = 0; j < 3; j++) {
-                Vec3f v0 = f.verts[j];
+                glm::vec3 v0 = f.verts[j];
                 glm::vec4 vertex = glm::vec4(v0.x, v0.y, v0.z, 1);
                 glm::vec4 transformedVertex = modelMatrix * vertex;
                 transformedVertices[j] = transformedVertex;
-                screenCoords[j] = { .x = (int)transformedVertex.x, .y = (int)transformedVertex.y};
+                screenCoords[j] = glm::vec2((int)transformedVertex.x, (int)transformedVertex.y);
             }
 
-            Vec3f normalA = f.normals[0];
+            glm::vec3 normalA = f.normals[0];
             modelMatrix = translation * rotation;
             glm::mat4 normalModelMatrix = glm::transpose(glm::inverse(modelMatrix));
             glm::vec4 normal = glm::vec4(normalA.x, normalA.y, normalA.z, 1);
@@ -263,14 +265,14 @@ int main(int argc, char** argv) {
 
                 case POINTS:
                     for (int i=0; i < 3; i++) {
-                        Vec2i coords = screenCoords[i];
+                        glm::vec2 coords = screenCoords[i];
                         drawPixel(coords.x, coords.y, color, image);
                     }
                     break;
 
                 case NORMALS:
-                    Vec2i normalStart = { .x = int(transformedVertices[0].x + transformedNormal.x), .y = int(transformedVertices[0].y + transformedNormal.y) };
-                    Vec2i normalEnd = { .x = int(transformedVertices[0].x + transformedNormal.x * 10.0f), .y = int(transformedVertices[0].y + transformedNormal.y * 10.0f) };
+                    glm::vec2 normalStart = glm::vec2( int(transformedVertices[0].x + transformedNormal.x), int(transformedVertices[0].y + transformedNormal.y) );
+                    glm::vec2 normalEnd = glm::vec2( int(transformedVertices[0].x + transformedNormal.x * 10.0f), int(transformedVertices[0].y + transformedNormal.y * 10.0f) );
                     drawLine(normalStart, normalEnd, image, color);
                     break;
             }
