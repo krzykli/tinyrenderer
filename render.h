@@ -3,11 +3,12 @@
 #define __RENDER_H__
 
 #include "app.h"
+#include "debug.h"
 #include "image.h"
 #include "types.h"
 #include <glm/gtx/transform.hpp>
 
-void trRender(App* app) {
+void trRender(App *app) {
     if (app->turntable) {
         app->rotateY = app->rotateY + app->turntableSpeed * app->deltaTime * 20;
         if (app->rotateY > 360.f) {
@@ -39,21 +40,30 @@ void trRender(App* app) {
         modelMatrix = translation * rotation;
         glm::mat4 normalModelMatrix = glm::transpose(glm::inverse(modelMatrix));
         glm::vec4 normal = glm::vec4(normalA.x, normalA.y, normalA.z, 1);
-        glm::vec4 transformedNormal = normalModelMatrix * normal;
+        glm::vec3 transformedNormal = glm::normalize(glm::vec3(normalModelMatrix * normal));
 
-        u32 color = int((normalA.x + 1) / 2 * 255) | int((normalA.y + 1) / 2 * 255) << 8 |
-                    int((normalA.z + 1) / 2 * 255) << 16 | (0 << 24);
+        glm::vec3 lightDir(0, 1, -1);
+        float intensity = glm::dot(glm::vec3(transformedNormal), glm::normalize(lightDir));
+
+        u32 normalColor = int((normalA.x + 1) / 2 * 255) | int((normalA.y + 1) / 2 * 255) << 8 |
+                          int((normalA.z + 1) / 2 * 255) << 16 | (0 << 24);
 
         switch (app->renderMode) {
 
-        case TRIANGLES:
-            drawTriangle(screenCoords[0], screenCoords[1], screenCoords[2], app->image, color);
+        case TRIANGLES: {
+            u32 color = int(255 * intensity) | int(255 * intensity) << 8 |
+                        int(255 * intensity) << 16 | (0 << 24);
+            if (intensity > 0) {
+                drawTriangle(screenCoords[0], screenCoords[1], screenCoords[2], app->image, color);
+            }
             break;
+        }
 
         case POINTS:
+
             for (int i = 0; i < 3; i++) {
                 glm::vec2 coords = screenCoords[i];
-                drawPixel(coords.x, coords.y, color, app->image);
+                drawPixel(coords.x, coords.y, normalColor, app->image);
             }
             break;
 
@@ -63,7 +73,7 @@ void trRender(App* app) {
             glm::vec2 normalEnd =
                 glm::vec2(int(transformedVertices[0].x + transformedNormal.x * 10.0f),
                           int(transformedVertices[0].y + transformedNormal.y * 10.0f));
-            drawLine(normalStart, normalEnd, app->image, color);
+            drawLine(normalStart, normalEnd, app->image, normalColor);
             break;
         }
     }

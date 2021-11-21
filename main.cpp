@@ -29,9 +29,6 @@ App app;
 int BUFFER_WIDTH = 1280;
 int BUFFER_HEIGHT = 920;
 
-u32 RED = 255 | (0 << 8) | (0 << 16) | (0 << 24);
-u32 WHITE = 255 | (255 << 8) | (255 << 16) | (255 << 24);
-
 const char *plugin = CR_PLUGIN("imalive");
 
 void clearImage(Image &image) {

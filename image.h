@@ -5,6 +5,8 @@
 #include <glm/gtx/transform.hpp>
 #include <stdlib.h>
 
+u32 RED = 255 | (0 << 8) | (0 << 16) | (0 << 24);
+u32 WHITE = 255 | (255 << 8) | (255 << 16) | (255 << 24);
 
 void drawPixel(u32 x, u32 y, u32 color, Image &image) {
     if (x > 0 && x < image.width - 1 && y > 0 && y < image.height - 1) {
@@ -81,6 +83,41 @@ void drawTriangle(glm::vec2 t0, glm::vec2 t1, glm::vec2 t2, Image &image, u32 co
                 drawPixel(p.x, p.y, color, image);
             }
         }
+    }
+}
+
+void drawCircle(glm::vec2 center, float radius) {
+    float d = 3 - 2 * radius;
+    float p = 0;
+    float q = radius;
+
+    while (p <= q) {
+    }
+}
+
+void drawCircle(int xc, int yc, int x, int y, Image& image, u32 color) {
+    drawPixel(xc + x, yc + y, color, image);
+    drawPixel(xc - x, yc + y, color, image);
+    drawPixel(xc + x, yc - y, color, image);
+    drawPixel(xc - x, yc - y, color, image);
+    drawPixel(xc + y, yc + x, color, image);
+    drawPixel(xc - y, yc + x, color, image);
+    drawPixel(xc + y, yc - x, color, image);
+    drawPixel(xc - y, yc - x, color, image);
+}
+
+void circleBres(int xc, int yc, int r, Image& image, u32 color) {
+    int x = 0, y = r;
+    int d = 3 - 2 * r;
+    drawCircle(xc, yc, x, y, image, color);
+    while (y >= x) {
+        x++;
+        if (d > 0) {
+            y--;
+            d = d + 4 * (x - y) + 10;
+        } else
+            d = d + 4 * x + 6;
+        drawCircle(xc, yc, x, y, image, color);
     }
 }
 
