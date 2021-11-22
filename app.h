@@ -7,6 +7,7 @@ typedef struct App {
     int resolutionX;
     int resolutionY;
     Image image;
+    Camera camera;
 
     bool displayUI;
     bool isRunning;

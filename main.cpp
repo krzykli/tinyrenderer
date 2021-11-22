@@ -49,6 +49,9 @@ struct HostData {
 };
 
 void keyCallback(GLFWwindow *window, int key, int scancode, int action, int mods) {
+
+    const float cameraSpeed = 0.05f; // adjust accordingly
+
     if (action == GLFW_PRESS) {
 
         switch (key) {
@@ -92,6 +95,22 @@ void keyCallback(GLFWwindow *window, int key, int scancode, int action, int mods
         case GLFW_KEY_DOWN:
             app.scale /= 1.1;
             break;
+
+        case GLFW_KEY_W:
+            app.camera.pos += cameraSpeed * app.camera.front;
+            break;
+
+        case GLFW_KEY_S:
+            app.camera.pos -= cameraSpeed * app.camera.front;
+            break;
+
+        case GLFW_KEY_A:
+            app.camera.pos -= glm::normalize(glm::cross(app.camera.front, app.camera.up)) * cameraSpeed;
+            break;
+
+        case GLFW_KEY_D:
+            app.camera.pos += glm::normalize(glm::cross(app.camera.front, app.camera.up)) * cameraSpeed;
+            break;
         }
     }
 }
@@ -101,6 +120,13 @@ void initAppDefaults() {
     app.resolutionY = BUFFER_HEIGHT;
     app.isRunning = true;
     app.displayUI = true;
+
+    Camera cam;
+    cam.pos = glm::vec3(0, 0, -10);
+    cam.front = glm::vec3(0, 0, -1);
+    cam.up = glm::vec3(0, 1, 0);
+    cam.fov = 45.f;
+    app.camera = cam;
 
     app.translateX = 400;
     app.translateY = 400;
@@ -268,6 +294,7 @@ int main(int argc, char **argv) {
             if (ImGui::CollapsingHeader("Settings")) {
 
                 ImGui::Separator();
+                ImGui::SliderFloat3("direction", &app.camera.front.x, -1, 1, "%.4f");
                 ImGui::SliderFloat("translateX", &app.translateX, 0, BUFFER_WIDTH, "%.4f");
                 ImGui::SliderFloat("translateY", &app.translateY, 0, BUFFER_HEIGHT, "%.4f");
                 ImGui::SliderFloat("rotateY", &app.rotateY, -360, 360);

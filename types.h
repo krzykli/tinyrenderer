@@ -14,6 +14,13 @@ typedef uint8_t u8;
 
 enum RenderMode { TRIANGLES = 0, POINTS = 1, NORMALS = 2 };
 
+typedef struct Camera {
+    glm::vec3 pos;
+    glm::vec3 front;
+    glm::vec3 up;
+    float fov;
+} Camera;
+
 typedef struct Image {
     u32 *buffer;
     u32 width;

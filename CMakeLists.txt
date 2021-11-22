@@ -24,5 +24,10 @@ target_link_libraries(tinyrenderer
     "/usr/local/Cellar/glew/2.2.0_1/lib/libGLEW.dylib"
 )
 
+target_link_libraries(imalive
+    ${OPENGL_LIBRARY}
+    "/usr/local/Cellar/glfw/3.3.4/lib/libglfw.dylib"
+)
+
 add_compile_options("-Wall -D")
 

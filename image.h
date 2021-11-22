@@ -6,6 +6,8 @@
 #include <stdlib.h>
 
 u32 RED = 255 | (0 << 8) | (0 << 16) | (0 << 24);
+u32 GREEN = 0 | (255 << 8) | (0 << 16) | (0 << 24);
+u32 BLUE = 0 | (0 << 8) | (255 << 16) | (0 << 24);
 u32 WHITE = 255 | (255 << 8) | (255 << 16) | (255 << 24);
 
 void drawPixel(u32 x, u32 y, u32 color, Image &image) {

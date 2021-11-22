@@ -7,6 +7,18 @@
 #include "image.h"
 #include "types.h"
 #include <glm/gtx/transform.hpp>
+#include <GLFW/glfw3.h>
+
+
+glm::vec3 getProjected(glm::vec3 test, Camera cam, int w, int h) {
+    glm::vec4 viewport(0.0f, 0.0f, w, h);
+
+    glm::mat4 view = glm::lookAt(cam.pos, cam.pos + cam.front, glm::vec3(0,1,0));
+    glm::mat4 perspective = glm::perspective(glm::radians(cam.fov), w/float(h), 0.001f, 1000.0f);
+
+    glm::vec3 projected = glm::project(test, view, perspective, viewport);
+    return projected;
+}
 
 void trRender(App *app) {
     if (app->turntable) {
@@ -15,6 +27,25 @@ void trRender(App *app) {
             app->rotateY = 0;
         }
     }
+
+    Image image = app->image;
+    Camera cam = app->camera;
+    int width = image.width;
+    int height = image.height;
+
+    glm::vec3 test (0, 0, 0);
+    glm::vec3 projectedOrigin = getProjected(test, cam, width, height);
+    glm::vec3 xAxis = glm::vec3(1, 0, 0);
+    glm::vec3 yAxis = glm::vec3(0, 1, 0);
+    glm::vec3 zAxis = glm::vec3(0, 0, 1);
+
+    glm::vec3 projectedxAxis = getProjected(xAxis, cam, width, height);
+    glm::vec3 projectedyAxis = getProjected(yAxis, cam, width, height);
+    glm::vec3 projectedzAxis = getProjected(zAxis, cam, width, height);
+
+    drawLine(glm::vec2(projectedOrigin), glm::vec2(projectedxAxis), image, RED);
+    drawLine(glm::vec2(projectedOrigin), glm::vec2(projectedyAxis), image, GREEN);
+    drawLine(glm::vec2(projectedOrigin), glm::vec2(projectedzAxis), image, BLUE);
 
     for (int i = 0; i < app->modelData.faces.size(); i++) {
         Face f = app->modelData.faces[i];
