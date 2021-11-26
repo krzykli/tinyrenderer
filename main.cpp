@@ -25,6 +25,10 @@
 #include "types.h"
 
 App app;
+bool firstMouse = false;
+int mouseButtonDrag = false;
+
+bool showZbuffer = false;
 
 int BUFFER_WIDTH = 1280;
 int BUFFER_HEIGHT = 920;
@@ -34,7 +38,35 @@ const char *plugin = CR_PLUGIN("imalive");
 void clearImage(Image &image) {
     for (int i = 0; i < image.width * image.height; i++) {
         image.buffer[i] = 0;
+        image.zbuffer[i] = 0;
     }
+}
+
+void flipImageVertically(Image &image) {
+    int width = image.width;
+    int height = image.height;
+    unsigned rows = height / 2;
+    unsigned *tempRow = (u32 *)malloc(width * sizeof(u32));
+
+    for (unsigned rowIndex = 0; rowIndex < rows; rowIndex++) {
+        memcpy(tempRow, image.buffer + rowIndex * width, width * sizeof(u32));
+        memcpy(image.buffer + rowIndex * width, image.buffer + (height - rowIndex - 1) * width,
+               width * sizeof(u32));
+        memcpy(image.buffer + (height - rowIndex - 1) * width, tempRow, width * sizeof(u32));
+    }
+
+    free(tempRow);
+
+    float *tempRowZdepth = (float *)malloc(width * sizeof(float));
+
+    for (int rowIndex = 0; rowIndex < rows; rowIndex++) {
+        memcpy(tempRowZdepth, image.zbuffer + rowIndex * width, width * sizeof(float));
+        memcpy(image.zbuffer + rowIndex * width, image.zbuffer + (height - rowIndex - 1) * width,
+               width * sizeof(float));
+        memcpy(image.zbuffer + (height - rowIndex - 1) * width, tempRowZdepth, width * sizeof(float));
+    }
+
+    free(tempRowZdepth);
 }
 
 struct HostData {
@@ -48,9 +80,54 @@ struct HostData {
     float mouseWheel = 0.0f;
 };
 
+void mouseButtonCallback(GLFWwindow *window, int button, int action, int mods) {
+    if (button == GLFW_MOUSE_BUTTON_LEFT) {
+        if (GLFW_PRESS == action)
+            mouseButtonDrag = true;
+        else if (GLFW_RELEASE == action)
+            mouseButtonDrag = false;
+    }
+}
+
+void cursorCallback(GLFWwindow *window, double xpos, double ypos) {
+    if (firstMouse) {
+        app.lastX = xpos;
+        app.lastY = ypos;
+        firstMouse = false;
+    }
+
+    float xoffset = xpos - app.lastX;
+    float yoffset = app.lastY - ypos; // reversed since y-coordinates go from bottom to top
+
+    app.lastX = xpos;
+    app.lastY = ypos;
+
+    float sensitivity = 0.1f;
+
+    if (mouseButtonDrag) {
+
+        xoffset *= sensitivity;
+        yoffset *= sensitivity;
+
+        app.camera.yaw -= xoffset;
+        app.camera.pitch += yoffset;
+
+        if (app.camera.pitch > 89.0f)
+            app.camera.pitch = 89.0f;
+        if (app.camera.pitch < -89.0f)
+            app.camera.pitch = -89.0f;
+
+        glm::vec3 front;
+        front.x = cos(glm::radians(app.camera.yaw)) * cos(glm::radians(app.camera.pitch));
+        front.y = sin(glm::radians(app.camera.pitch));
+        front.z = sin(glm::radians(app.camera.yaw)) * cos(glm::radians(app.camera.pitch));
+        app.camera.front = glm::normalize(front);
+    }
+}
+
 void keyCallback(GLFWwindow *window, int key, int scancode, int action, int mods) {
 
-    const float cameraSpeed = 0.05f; // adjust accordingly
+    const float cameraSpeed = 0.5f; // adjust accordingly
 
     if (action == GLFW_PRESS) {
 
@@ -89,27 +166,29 @@ void keyCallback(GLFWwindow *window, int key, int scancode, int action, int mods
             break;
 
         case GLFW_KEY_UP:
-            app.scale *= 1.1;
+            app.camera.pos += cameraSpeed * app.camera.up;
             break;
 
         case GLFW_KEY_DOWN:
-            app.scale /= 1.1;
+            app.camera.pos -= cameraSpeed * app.camera.up;
             break;
 
         case GLFW_KEY_W:
-            app.camera.pos += cameraSpeed * app.camera.front;
-            break;
-
-        case GLFW_KEY_S:
             app.camera.pos -= cameraSpeed * app.camera.front;
             break;
 
+        case GLFW_KEY_S:
+            app.camera.pos += cameraSpeed * app.camera.front;
+            break;
+
         case GLFW_KEY_A:
-            app.camera.pos -= glm::normalize(glm::cross(app.camera.front, app.camera.up)) * cameraSpeed;
+            app.camera.pos +=
+                glm::normalize(glm::cross(app.camera.front, app.camera.up)) * cameraSpeed;
             break;
 
         case GLFW_KEY_D:
-            app.camera.pos += glm::normalize(glm::cross(app.camera.front, app.camera.up)) * cameraSpeed;
+            app.camera.pos -=
+                glm::normalize(glm::cross(app.camera.front, app.camera.up)) * cameraSpeed;
             break;
         }
     }
@@ -121,11 +200,19 @@ void initAppDefaults() {
     app.isRunning = true;
     app.displayUI = true;
 
+    // controls
+    app.lastX = BUFFER_WIDTH / 2.0;
+    app.lastY = BUFFER_HEIGHT / 2.0;
+
     Camera cam;
     cam.pos = glm::vec3(0, 0, -10);
     cam.front = glm::vec3(0, 0, -1);
     cam.up = glm::vec3(0, 1, 0);
     cam.fov = 45.f;
+    cam.yaw =
+        -90.0f; // yaw is initialized to -90.0 degrees since a yaw of 0.0 results in a direction
+                // vector pointing to the right so we initially rotate a bit to the left.
+    cam.pitch = 0.0f;
     app.camera = cam;
 
     app.translateX = 400;
@@ -172,6 +259,8 @@ int main(int argc, char **argv) {
         return -1;
 
     glfwSetKeyCallback(window, keyCallback);
+    glfwSetCursorPosCallback(window, cursorCallback);
+    glfwSetMouseButtonCallback(window, mouseButtonCallback);
     initImGui(window);
 
     glClearColor(0.0f, 0.0f, 0.0f, 0.0f);
@@ -179,22 +268,24 @@ int main(int argc, char **argv) {
     GLuint renderShaderProgramId = createShader("../shaders/render.vert", "../shaders/render.frag");
 
     app.image.buffer = (u32 *)malloc(BUFFER_WIDTH * BUFFER_HEIGHT * sizeof(u32));
+    app.image.zbuffer = (float *)malloc(BUFFER_WIDTH * BUFFER_HEIGHT * sizeof(float));
     app.image.width = BUFFER_WIDTH;
     app.image.height = BUFFER_HEIGHT;
 
     GLuint renderTextureId;
     glGenTextures(1, &renderTextureId);
 
-    GLuint renderVAO =
-        initTextureRender(app.image.width, app.image.height, renderTextureId, renderShaderProgramId);
+    GLuint renderVAO = initTextureRender(app.image.width, app.image.height, renderTextureId,
+                                         renderShaderProgramId);
 
     double currentFrame = glfwGetTime();
     double lastFrame = currentFrame;
     bool lockFramerate = true;
     char fpsDisplay[12];
 
-    std::string currentFile("../obj/armadillo.obj");
-    loadOBJ(currentFile.c_str(), app.modelData.faces, app.modelData.vertices, app.modelData.uvs, app.modelData.normals);
+    std::string currentFile("../obj/suzanne.obj");
+    loadOBJ(currentFile.c_str(), app.modelData.faces, app.modelData.vertices, app.modelData.uvs,
+            app.modelData.normals);
 
     cr_plugin ctx;
     ctx.userdata = &app;
@@ -223,14 +314,20 @@ int main(int argc, char **argv) {
         }
 
         cr_plugin_update(ctx); // render
+        flipImageVertically(app.image);
 
         glClear(GL_COLOR_BUFFER_BIT);
 
         glBindTexture(GL_TEXTURE_2D, renderTextureId);
         glActiveTexture(GL_TEXTURE0);
         glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-        glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, app.image.width, app.image.height, GL_RGBA,
-                        GL_UNSIGNED_BYTE, app.image.buffer);
+        if (showZbuffer) {
+            glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, app.image.width, app.image.height, GL_RGBA,
+                            GL_UNSIGNED_BYTE, app.image.zbuffer);
+        } else {
+            glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, app.image.width, app.image.height, GL_RGBA,
+                            GL_UNSIGNED_BYTE, app.image.buffer);
+        }
 
         glBindVertexArray(renderVAO);
         glUseProgram(renderShaderProgramId);
@@ -292,7 +389,8 @@ int main(int argc, char **argv) {
                 app.renderMode = NORMALS;
             }
             if (ImGui::CollapsingHeader("Settings")) {
-
+                ImGui::Separator();
+                ImGui::Checkbox("ZBuffer", &showZbuffer);
                 ImGui::Separator();
                 ImGui::SliderFloat3("direction", &app.camera.front.x, -1, 1, "%.4f");
                 ImGui::SliderFloat("translateX", &app.translateX, 0, BUFFER_WIDTH, "%.4f");
@@ -344,6 +442,7 @@ int main(int argc, char **argv) {
 
     // Cleanup
     free(app.image.buffer);
+    free(app.image.zbuffer);
     destroyImGui();
 
     glfwDestroyWindow(window);

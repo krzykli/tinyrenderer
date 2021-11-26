@@ -11,7 +11,7 @@ u32 BLUE = 0 | (0 << 8) | (255 << 16) | (0 << 24);
 u32 WHITE = 255 | (255 << 8) | (255 << 16) | (255 << 24);
 
 void drawPixel(u32 x, u32 y, u32 color, Image &image) {
-    if (x > 0 && x < image.width - 1 && y > 0 && y < image.height - 1) {
+    if (x > 0 && x <= image.width - 1 && y > 0 && y <= image.height - 1) {
         image.buffer[x + image.width * y] = color;
     }
 }
@@ -66,38 +66,73 @@ bool edgeFunction(glm::vec2 &a, glm::vec2 &b, glm::vec2 &c) {
     return ((c.x - a.x) * (b.y - a.y) - (c.y - a.y) * (b.x - a.x) >= 0);
 }
 
-void drawTriangle(glm::vec2 t0, glm::vec2 t1, glm::vec2 t2, Image &image, u32 color) {
-    int minX = imin(imin(t0.x, t1.x), t2.x);
-    int maxX = imax(imax(t0.x, t1.x), t2.x);
+glm::vec3 barycentric(glm::vec3 A, glm::vec3 B, glm::vec3 C, glm::vec3 P) {
+    glm::vec3 s[2];
+    for (int i = 2; i--;) {
+        s[i][0] = C[i] - A[i];
+        s[i][1] = B[i] - A[i];
+        s[i][2] = A[i] - P[i];
+    }
+    glm::vec3 u = cross(s[0], s[1]);
+    if (std::abs(u[2]) > 1e-2)
+        return glm::vec3(1.f - (u.x + u.y) / u.z, u.y / u.z, u.x / u.z);
+    return glm::vec3(-1, 1, 1);
+}
 
-    int minY = imin(imin(t0.y, t1.y), t2.y);
-    int maxY = imax(imax(t0.y, t1.y), t2.y);
+/* void drawTriangle(glm::vec2 t0, glm::vec2 t1, glm::vec2 t2, Image &image, u32 color) { */
+/*     int minX = imin(imin(imin(t0.x, t1.x), t2.x), image.width - 1); */
+/*     int maxX = imax(imax(imax(t0.x, t1.x), t2.x), 0); */
 
-    for (int x = minX; x < maxX; x++) {
-        for (int y = minY; y < maxY; y++) {
+/*     int minY = imin(imin(imin(t0.y, t1.y), t2.y), image.height - 1); */
+/*     int maxY = imax(imax(imax(t0.y, t1.y), t2.y), 0); */
 
-            glm::vec2 p(x, y);
-            bool insideEdgeA = edgeFunction(t1, t2, p);
-            bool insideEdgeB = edgeFunction(t2, t0, p);
-            bool insideEdgeC = edgeFunction(t0, t1, p);
+/*     for (int x = minX; x < maxX; x++) { */
+/*         for (int y = minY; y < maxY; y++) { */
 
-            if (insideEdgeA && insideEdgeB && insideEdgeC) {
-                drawPixel(p.x, p.y, color, image);
+/*             glm::vec2 p(x, y); */
+/*             bool insideEdgeA = edgeFunction(t1, t2, p); */
+/*             bool insideEdgeB = edgeFunction(t2, t0, p); */
+/*             bool insideEdgeC = edgeFunction(t0, t1, p); */
+
+/*             if (insideEdgeA && insideEdgeB && insideEdgeC) { */
+/*                 drawPixel(p.x, p.y, color, image); */
+/*             } */
+/*         } */
+/*     } */
+/* } */
+
+void drawTriangle(glm::vec3 t0, glm::vec3 t1, glm::vec3 t2, Image &image, u32 color) {
+    int minX = imin(imin(imin(t0.x, t1.x), t2.x), image.width - 1);
+    int maxX = imax(imax(imax(t0.x, t1.x), t2.x), 0);
+
+    int minY = imin(imin(imin(t0.y, t1.y), t2.y), image.height - 1);
+    int maxY = imax(imax(imax(t0.y, t1.y), t2.y), 0);
+
+    glm::vec3 P;
+    for (P.x = minX; P.x <= maxX; P.x++) {
+        for (P.y = minY; P.y <= maxY; P.y++) {
+
+            glm::vec3 bc_screen = barycentric(t0, t1, t2, P);
+
+            if (bc_screen.x < 0 || bc_screen.y < 0 || bc_screen.z < 0)
+                continue;
+
+            P.z = 0;
+            P.z += t0.z * bc_screen[0];
+            P.z += t1.z * bc_screen[1];
+            P.z += t2.z * bc_screen[2];
+
+            int coord = int(P.x + P.y * image.width);
+
+            if (image.zbuffer[coord] < P.z) {
+                image.zbuffer[coord] = P.z;
+                drawPixel(P.x, P.y, color, image);
             }
         }
     }
 }
 
-void drawCircle(glm::vec2 center, float radius) {
-    float d = 3 - 2 * radius;
-    float p = 0;
-    float q = radius;
-
-    while (p <= q) {
-    }
-}
-
-void drawCircle(int xc, int yc, int x, int y, Image& image, u32 color) {
+void drawCircle(int xc, int yc, int x, int y, Image &image, u32 color) {
     drawPixel(xc + x, yc + y, color, image);
     drawPixel(xc - x, yc + y, color, image);
     drawPixel(xc + x, yc - y, color, image);
@@ -108,7 +143,7 @@ void drawCircle(int xc, int yc, int x, int y, Image& image, u32 color) {
     drawPixel(xc - y, yc - x, color, image);
 }
 
-void circleBres(int xc, int yc, int r, Image& image, u32 color) {
+void circleBres(int xc, int yc, int r, Image &image, u32 color) {
     int x = 0, y = r;
     int d = 3 - 2 * r;
     drawCircle(xc, yc, x, y, image, color);

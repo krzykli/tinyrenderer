@@ -9,6 +9,9 @@ typedef struct App {
     Image image;
     Camera camera;
 
+    float lastX;
+    float lastY;
+
     bool displayUI;
     bool isRunning;
     bool turntable;

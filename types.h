@@ -19,10 +19,16 @@ typedef struct Camera {
     glm::vec3 front;
     glm::vec3 up;
     float fov;
+
+    float yaw;
+    float pitch;
+    float lastX;
+    float lastY;
 } Camera;
 
 typedef struct Image {
     u32 *buffer;
+    float *zbuffer;
     u32 width;
     u32 height;
 } Image;
