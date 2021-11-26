@@ -8,12 +8,26 @@
 #include "debug.h"
 #include "image.h"
 #include "types.h"
-#include <glm/gtx/transform.hpp>
 #include <GLFW/glfw3.h>
+#include <glm/gtx/transform.hpp>
 
 #include <glm/gtx/string_cast.hpp>
 
+void drawAxis(glm::mat4 view, glm::mat4 perspective, glm::vec4 viewport, Image image) {
+    glm::vec3 origin(0, 0, 0);
+    glm::vec3 projectedOrigin = glm::project(origin, view, perspective, viewport);
+    glm::vec3 xAxis = glm::vec3(1, 0, 0);
+    glm::vec3 yAxis = glm::vec3(0, 1, 0);
+    glm::vec3 zAxis = glm::vec3(0, 0, 1);
 
+    glm::vec3 projectedxAxis = glm::project(xAxis, view, perspective, viewport);
+    glm::vec3 projectedyAxis = glm::project(yAxis, view, perspective, viewport);
+    glm::vec3 projectedzAxis = glm::project(zAxis, view, perspective, viewport);
+
+    drawLine(glm::vec2(projectedOrigin), glm::vec2(projectedxAxis), image, RED);
+    drawLine(glm::vec2(projectedOrigin), glm::vec2(projectedyAxis), image, GREEN);
+    drawLine(glm::vec2(projectedOrigin), glm::vec2(projectedzAxis), image, BLUE);
+}
 
 void trRender(App *app) {
     if (app->turntable) {
@@ -28,25 +42,14 @@ void trRender(App *app) {
     int width = image.width;
     int height = image.height;
 
-    glm::mat4 view = glm::lookAt(cam.pos, cam.pos + cam.front, glm::vec3(0,1,0));
-    glm::mat4 perspective = glm::perspective(glm::radians(45.0f), width/float(height), 0.01f, 1000.0f);
+    glm::mat4 view = glm::lookAt(cam.pos, cam.pos + cam.front, glm::vec3(0, 1, 0));
+    glm::mat4 perspective =
+        glm::perspective(glm::radians(45.0f), width / float(height), 0.01f, 1000.0f);
     glm::vec4 viewport(0.0f, 0.0f, width - 1, height - 1);
 
-
-    glm::vec3 origin (0, 0, 0);
-    glm::vec3 projectedOrigin = glm::project(origin, view, perspective, viewport);
-    glm::vec3 xAxis = glm::vec3(1, 0, 0);
-    glm::vec3 yAxis = glm::vec3(0, 1, 0);
-    glm::vec3 zAxis = glm::vec3(0, 0, 1);
-
-    glm::vec3 projectedxAxis = glm::project(xAxis, view, perspective, viewport);
-    glm::vec3 projectedyAxis = glm::project(yAxis, view, perspective, viewport);
-    glm::vec3 projectedzAxis = glm::project(zAxis, view, perspective, viewport);
-
-    drawLine(glm::vec2(projectedOrigin), glm::vec2(projectedxAxis), image, RED);
-    drawLine(glm::vec2(projectedOrigin), glm::vec2(projectedyAxis), image, GREEN);
-    drawLine(glm::vec2(projectedOrigin), glm::vec2(projectedzAxis), image, BLUE);
-
+    if (app->showAxis) {
+        drawAxis(view, perspective, viewport, image);
+    }
 
     for (int i = 0; i < app->modelData.faces.size(); i++) {
         Face f = app->modelData.faces[i];
@@ -93,7 +96,6 @@ void trRender(App *app) {
         }
 
         case POINTS:
-
             for (int i = 0; i < 3; i++) {
                 glm::vec2 coords = glm::ivec2(screenCoords[i]);
                 drawPixel(coords.x, coords.y, normalColor, app->image);
@@ -101,11 +103,10 @@ void trRender(App *app) {
             break;
 
         case NORMALS:
-            glm::vec3 normalStart = transformedVertices[0];
-            glm::vec3 normalEnd = transformedVertices[0] + transformedNormal * 10.0f;
-            glm::vec3 screenCoordsStart = glm::project(glm::vec3(normalStart), modelView, perspective, viewport);
-            glm::vec3 screenCoordsEnd = glm::project(glm::vec3(normalEnd), modelView, perspective, viewport);
-            drawLine(normalStart, normalEnd, app->image, normalColor);
+            glm::vec3 normalEnd = f.verts[0] + normalA * app->normalLength;
+            glm::vec3 screenCoordsEnd =
+                glm::project(glm::vec3(normalEnd), modelView, perspective, viewport);
+            drawLine(screenCoords[0], screenCoordsEnd, app->image, normalColor);
             break;
         }
     }

@@ -12,7 +12,9 @@ typedef struct App {
     float lastX;
     float lastY;
 
+    float normalLength;
     bool displayUI;
+    bool showAxis;
     bool isRunning;
     bool turntable;
     float turntableSpeed;

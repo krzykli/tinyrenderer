@@ -90,6 +90,11 @@ void mouseButtonCallback(GLFWwindow *window, int button, int action, int mods) {
 }
 
 void cursorCallback(GLFWwindow *window, double xpos, double ypos) {
+    ImGuiIO &io = ImGui::GetIO();
+    if (io.WantCaptureMouse) {
+        return;
+    }
+
     if (firstMouse) {
         app.lastX = xpos;
         app.lastY = ypos;
@@ -149,20 +154,12 @@ void keyCallback(GLFWwindow *window, int key, int scancode, int action, int mods
     } else {
         switch (key) {
 
-        case GLFW_KEY_H:
-            app.translateX -= 50;
+        case GLFW_KEY_Z:
+            showZbuffer = !showZbuffer;
             break;
 
-        case GLFW_KEY_L:
-            app.translateX += 50;
-            break;
-
-        case GLFW_KEY_J:
-            app.translateY -= 50;
-            break;
-
-        case GLFW_KEY_K:
-            app.translateY += 50;
+        case GLFW_KEY_X:
+            app.showAxis = !app.showAxis;
             break;
 
         case GLFW_KEY_UP:
@@ -215,10 +212,9 @@ void initAppDefaults() {
     cam.pitch = 0.0f;
     app.camera = cam;
 
-    app.translateX = 400;
-    app.translateY = 400;
-    app.scale = 150;
+    app.normalLength = 0.1f;
 
+    app.showAxis = true;
     app.turntable = true;
     app.turntableSpeed = 2;
 
@@ -230,7 +226,6 @@ void initImGui(GLFWwindow *window) {
     IMGUI_CHECKVERSION();
     ImGui::CreateContext();
     ImGuiIO &io = ImGui::GetIO();
-    (void)io;
     ImGui::StyleColorsDark();
 
     ImGui_ImplGlfw_InitForOpenGL(window, true);
@@ -340,7 +335,6 @@ int main(int argc, char **argv) {
             ImGui_ImplGlfw_NewFrame();
             ImGui::NewFrame();
             //
-
             if (ImGui::BeginMainMenuBar()) {
                 if (ImGui::BeginMenu("File")) {
                     if (ImGui::MenuItem("Import Obj...")) {
@@ -390,16 +384,12 @@ int main(int argc, char **argv) {
             }
             if (ImGui::CollapsingHeader("Settings")) {
                 ImGui::Separator();
-                ImGui::Checkbox("ZBuffer", &showZbuffer);
-                ImGui::Separator();
-                ImGui::SliderFloat3("direction", &app.camera.front.x, -1, 1, "%.4f");
-                ImGui::SliderFloat("translateX", &app.translateX, 0, BUFFER_WIDTH, "%.4f");
-                ImGui::SliderFloat("translateY", &app.translateY, 0, BUFFER_HEIGHT, "%.4f");
-                ImGui::SliderFloat("rotateY", &app.rotateY, -360, 360);
-                ImGui::SliderFloat("scale", &app.scale, 1, 300.0);
+
+                ImGui::SliderFloat("normalLength", &app.normalLength, 0.01f, 1.0f);
 
                 ImGui::Separator();
                 ImGui::Checkbox("Turntable", &app.turntable);
+                ImGui::SliderFloat("rotateY", &app.rotateY, -360, 360);
                 ImGui::SliderFloat("Speed", &app.turntableSpeed, 1, 5);
                 ImGui::Separator();
                 ImGui::Checkbox("Lock Framerate", &lockFramerate);
@@ -418,8 +408,9 @@ int main(int argc, char **argv) {
 
             ImGui::Spacing();
             ImGui::Text("Keyboard shortcuts:");
-            ImGui::Text("'hjkl': translate");
+            ImGui::Text("'wasd up/down': move camera");
             ImGui::Text("'o': open a new file");
+            ImGui::Text("'z': show z-buffer");
             ImGui::Text("'q': exit");
 
             ImGui::End();
