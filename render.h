@@ -39,6 +39,8 @@ void trRender(App *app) {
 
     Image image = app->image;
     Camera cam = app->camera;
+    Png png = app->pngInfo;
+
     int width = image.width;
     int height = image.height;
 
@@ -53,6 +55,11 @@ void trRender(App *app) {
 
     for (int i = 0; i < app->modelData.faces.size(); i++) {
         Face f = app->modelData.faces[i];
+
+        glm::vec3 uvs0 = f.uvs[0];
+        glm::vec3 uvs1 = f.uvs[1];
+        glm::vec3 uvs2 = f.uvs[2];
+
         glm::vec3 screenCoords[3];
 
         glm::mat4 rotation = glm::rotate(glm::radians(app->rotateY), glm::vec3(0, 1, 0));
@@ -89,9 +96,16 @@ void trRender(App *app) {
         switch (app->renderMode) {
 
         case TRIANGLES: {
-            u32 color = int(255 * intensity) | int(255 * intensity) << 8 |
-                        int(255 * intensity) << 16 | (0 << 24);
-            drawTriangle(screenCoords[0], screenCoords[1], screenCoords[2], app->image, color);
+
+            if (png.image != NULL) {
+
+                drawTriangleWithTexture(screenCoords[0], screenCoords[1], screenCoords[2], app->image, png, f.uvs);
+            }
+            else {
+                u32 color = int(255 * intensity) | int(255 * intensity) << 8 |
+                            int(255 * intensity) << 16 | (0 << 24);
+                drawTriangle(screenCoords[0], screenCoords[1], screenCoords[2], app->image, color);
+            }
             break;
         }
 

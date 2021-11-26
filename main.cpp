@@ -22,6 +22,7 @@
 #include "debug.h"
 #include "obj-model.h"
 #include "opengl-helpers.h"
+#include "thirdparty/lodepng/lodepng.h"
 #include "types.h"
 
 App app;
@@ -40,6 +41,18 @@ void clearImage(Image &image) {
         image.buffer[i] = 0;
         image.zbuffer[i] = 0;
     }
+}
+
+Png loadPNG(const char *filename) {
+    unsigned error;
+    unsigned char *image = 0;
+    unsigned width, height;
+
+    error = lodepng_decode32_file(&image, &width, &height, filename);
+    if (error)
+        printf("error %u: %s\n", error, lodepng_error_text(error));
+
+    return {.image = image, .width = width, .height = height };
 }
 
 void flipImageVertically(Image &image) {
@@ -63,7 +76,8 @@ void flipImageVertically(Image &image) {
         memcpy(tempRowZdepth, image.zbuffer + rowIndex * width, width * sizeof(float));
         memcpy(image.zbuffer + rowIndex * width, image.zbuffer + (height - rowIndex - 1) * width,
                width * sizeof(float));
-        memcpy(image.zbuffer + (height - rowIndex - 1) * width, tempRowZdepth, width * sizeof(float));
+        memcpy(image.zbuffer + (height - rowIndex - 1) * width, tempRowZdepth,
+               width * sizeof(float));
     }
 
     free(tempRowZdepth);
@@ -278,9 +292,11 @@ int main(int argc, char **argv) {
     bool lockFramerate = true;
     char fpsDisplay[12];
 
-    std::string currentFile("../obj/suzanne.obj");
+    std::string currentFile("../obj/african_head.obj");
     loadOBJ(currentFile.c_str(), app.modelData.faces, app.modelData.vertices, app.modelData.uvs,
             app.modelData.normals);
+
+    app.pngInfo = loadPNG("../african_head_diffuse.png");
 
     cr_plugin ctx;
     ctx.userdata = &app;

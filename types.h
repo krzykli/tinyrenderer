@@ -46,4 +46,12 @@ typedef struct ModelData{
     std::vector<glm::vec3> normals;
 } ModelData;
 
+
+typedef struct Png {
+    unsigned char* image;
+    unsigned width;
+    unsigned height;
+} Png;
+
+
 #endif // __TYPES_H__

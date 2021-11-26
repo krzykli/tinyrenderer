@@ -42,10 +42,7 @@ bool loadOBJ(const char *path, std::vector<Face> &out_faces,
 
       } else if (secondChar == 't') {
         glm::vec3 uv;
-        sscanf(line, "vt %f %f\n", &uv.x, &uv.y);
-        uv.y = -uv.y; // Invert V coordinate since we will only use DDS texture,
-                      // which are inverted. Remove if you want to use TGA or
-                      // BMP loaders.
+        sscanf(line, "vt %f %f %f\n", &uv.x, &uv.y, &uv.z);
         out_uvs.push_back(uv);
 
       } else if (secondChar == 'n') {
@@ -78,6 +75,10 @@ bool loadOBJ(const char *path, std::vector<Face> &out_faces,
       face.verts[0] = out_vertices[--vertexIndex[0]];
       face.verts[1] = out_vertices[--vertexIndex[1]];
       face.verts[2] = out_vertices[--vertexIndex[2]];
+
+      face.uvs[0] = out_uvs[--uvIndex[0]];
+      face.uvs[1] = out_uvs[--uvIndex[1]];
+      face.uvs[2] = out_uvs[--uvIndex[2]];
 
       face.normals[0] = out_normals[--normalIndex[0]];
       face.normals[1] = out_normals[--normalIndex[1]];

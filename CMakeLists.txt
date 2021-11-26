@@ -10,12 +10,14 @@ include_directories("/usr/local/Cellar/glew/2.2.0_1/include")
 include_directories("/usr/local/Cellar/glm/0.9.9.8/include")
 include_directories("./thirdparty/imgui")
 include_directories("./thirdparty/imguiFileDialog")
+include_directories("./thirdparty/lodepng")
 include_directories(".")
 
 file(GLOB RENDERER_SRC *.cpp)
 file(GLOB IMGUI_SRC ./thirdparty/imgui/*.cpp)
 file(GLOB IMGUIFILEDIALOG_SRC ./thirdparty/imguiFileDialog/*.cpp)
-add_executable(tinyrenderer ${IMGUI_SRC} ${IMGUIFILEDIALOG_SRC} ${RENDERER_SRC})
+file(GLOB LODEPNG_SRC ./thirdparty/lodepng/*.cpp)
+add_executable(tinyrenderer ${IMGUI_SRC} ${IMGUIFILEDIALOG_SRC} ${LODEPNG_SRC} ${RENDERER_SRC})
 add_library(imalive SHARED livelib.cpp)
 
 target_link_libraries(tinyrenderer

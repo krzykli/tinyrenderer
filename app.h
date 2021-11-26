@@ -21,6 +21,7 @@ typedef struct App {
     RenderMode renderMode;
 
     ModelData modelData;
+    Png pngInfo;
 
     float translateX;
     float translateY;

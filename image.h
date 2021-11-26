@@ -101,6 +101,62 @@ glm::vec3 barycentric(glm::vec3 A, glm::vec3 B, glm::vec3 C, glm::vec3 P) {
 /*     } */
 /* } */
 
+unsigned char* samplePngTexture(Png png, float u, float v) {
+    u32 width = png.width;
+    u32 height = png.height;
+    u32 x = width * u;
+    u32 y = height * v;
+
+    u32 offset = (y * width + x) * 4;
+    return &png.image[offset];
+}
+
+void drawTriangleWithTexture(glm::vec3 t0, glm::vec3 t1, glm::vec3 t2, Image &image, Png png, glm::vec3 *uvs) {
+    int minX = imin(imin(imin(t0.x, t1.x), t2.x), image.width - 1);
+    int maxX = imax(imax(imax(t0.x, t1.x), t2.x), 0);
+
+    int minY = imin(imin(imin(t0.y, t1.y), t2.y), image.height - 1);
+    int maxY = imax(imax(imax(t0.y, t1.y), t2.y), 0);
+
+    glm::vec3 P;
+    for (P.x = minX; P.x <= maxX; P.x++) {
+        for (P.y = minY; P.y <= maxY; P.y++) {
+
+            glm::vec3 bc = barycentric(t0, t1, t2, P);
+
+            if (bc.x < 0 || bc.y < 0 || bc.z < 0)
+                continue;
+
+            P.z = 0;
+            P.z += t0.z * bc[0];
+            P.z += t1.z * bc[1];
+            P.z += t2.z * bc[2];
+
+            glm::vec3 uv = bc[0] * uvs[0] + bc[1] * uvs[1] + bc[2] * uvs[2];
+
+            u32 width = png.width;
+            u32 height = png.height;
+            u32 x = width * uv.x;
+            u32 y = height * uv.y;
+
+            u32 offset = (y * width + x) * 4;
+
+            unsigned char r = png.image[offset];
+            unsigned char g = png.image[offset + 1];
+            unsigned char b = png.image[offset + 2];
+            u32 color = r | g << 8 | b << 16 | (255 << 24);
+
+            int coord = int(P.x + P.y * image.width);
+
+            if (image.zbuffer[coord] < P.z) {
+                image.zbuffer[coord] = P.z;
+
+                drawPixel(P.x, P.y, color, image);
+            }
+        }
+    }
+}
+
 void drawTriangle(glm::vec3 t0, glm::vec3 t1, glm::vec3 t2, Image &image, u32 color) {
     int minX = imin(imin(imin(t0.x, t1.x), t2.x), image.width - 1);
     int maxX = imax(imax(imax(t0.x, t1.x), t2.x), 0);
@@ -126,6 +182,7 @@ void drawTriangle(glm::vec3 t0, glm::vec3 t1, glm::vec3 t2, Image &image, u32 co
 
             if (image.zbuffer[coord] < P.z) {
                 image.zbuffer[coord] = P.z;
+
                 drawPixel(P.x, P.y, color, image);
             }
         }
