@@ -52,7 +52,7 @@ Png loadPNG(const char *filename) {
     if (error)
         printf("error %u: %s\n", error, lodepng_error_text(error));
 
-    return {.image = image, .width = width, .height = height };
+    return {.image = image, .width = width, .height = height};
 }
 
 void flipImageVertically(Image &image) {
@@ -101,6 +101,11 @@ void mouseButtonCallback(GLFWwindow *window, int button, int action, int mods) {
         else if (GLFW_RELEASE == action)
             mouseButtonDrag = false;
     }
+}
+
+void scrollCallback(GLFWwindow *window, double xoffset, double yoffset) {
+    float sensitivity = 0.1f;
+    app.camera.pos -= app.camera.front * float(yoffset * sensitivity);
 }
 
 void cursorCallback(GLFWwindow *window, double xpos, double ypos) {
@@ -164,6 +169,11 @@ void keyCallback(GLFWwindow *window, int key, int scancode, int action, int mods
             ImGuiFileDialog::Instance()->OpenDialog("ChooseFileDlgKey", "Choose File", ".obj",
                                                     "../obj/");
             break;
+
+        case GLFW_KEY_T:
+            ImGuiFileDialog::Instance()->OpenDialog("ChooseFileDlgKey", "Choose File", ".png",
+                                                    "../textures/");
+            break;
         }
     } else {
         switch (key) {
@@ -225,8 +235,10 @@ void initAppDefaults() {
                 // vector pointing to the right so we initially rotate a bit to the left.
     cam.pitch = 0.0f;
     app.camera = cam;
+    app.pngInfo = {};
 
     app.normalLength = 0.1f;
+    app.lightDir = glm::vec3(1, 1, -1);
 
     app.showAxis = true;
     app.turntable = true;
@@ -270,6 +282,7 @@ int main(int argc, char **argv) {
     glfwSetKeyCallback(window, keyCallback);
     glfwSetCursorPosCallback(window, cursorCallback);
     glfwSetMouseButtonCallback(window, mouseButtonCallback);
+    glfwSetScrollCallback(window, scrollCallback);
     initImGui(window);
 
     glClearColor(0.0f, 0.0f, 0.0f, 0.0f);
@@ -292,11 +305,12 @@ int main(int argc, char **argv) {
     bool lockFramerate = true;
     char fpsDisplay[12];
 
-    std::string currentFile("../obj/african_head.obj");
-    loadOBJ(currentFile.c_str(), app.modelData.faces, app.modelData.vertices, app.modelData.uvs,
+    std::string currentObj("../obj/african_head.obj");
+    loadOBJ(currentObj.c_str(), app.modelData.faces, app.modelData.vertices, app.modelData.uvs,
             app.modelData.normals);
 
-    app.pngInfo = loadPNG("../african_head_diffuse.png");
+    std::string currentTexture("../textures/african_head_diffuse.png");
+    app.pngInfo = loadPNG(currentTexture.c_str());
 
     cr_plugin ctx;
     ctx.userdata = &app;
@@ -357,6 +371,10 @@ int main(int argc, char **argv) {
                         ImGuiFileDialog::Instance()->OpenDialog("ChooseFileDlgKey", "Choose File",
                                                                 ".obj", "../obj/");
                     }
+                    if (ImGui::MenuItem("Import Texture...")) {
+                        ImGuiFileDialog::Instance()->OpenDialog("ChooseFileDlgKey", "Choose File",
+                                                                ".png", "../textures/");
+                    }
                     ImGui::EndMenu();
                 }
 
@@ -364,15 +382,24 @@ int main(int argc, char **argv) {
             }
 
             if (ImGuiFileDialog::Instance()->Display("ChooseFileDlgKey")) {
-                if (ImGuiFileDialog::Instance()->IsOk()) {
-                    currentFile = ImGuiFileDialog::Instance()->GetFilePathName();
-                    app.modelData.faces.clear();
-                    app.modelData.vertices.clear();
-                    app.modelData.uvs.clear();
-                    app.modelData.normals.clear();
 
-                    loadOBJ(currentFile.c_str(), app.modelData.faces, app.modelData.vertices,
-                            app.modelData.uvs, app.modelData.normals);
+                if (ImGuiFileDialog::Instance()->IsOk()) {
+                    std::string path = ImGuiFileDialog::Instance()->GetFilePathName();
+                    if (strstr(path.c_str(), ".obj")) {
+                        currentObj = path;
+                        app.modelData.faces.clear();
+                        app.modelData.vertices.clear();
+                        app.modelData.uvs.clear();
+                        app.modelData.normals.clear();
+
+                        loadOBJ(currentObj.c_str(), app.modelData.faces, app.modelData.vertices,
+                                app.modelData.uvs, app.modelData.normals);
+                    }
+                    else if (strstr(path.c_str(), ".png")) {
+                        currentTexture = path;
+                        free(app.pngInfo.image);
+                        app.pngInfo = loadPNG(path.c_str());
+                    }
                 }
                 ImGuiFileDialog::Instance()->Close();
             }
@@ -401,7 +428,8 @@ int main(int argc, char **argv) {
             if (ImGui::CollapsingHeader("Settings")) {
                 ImGui::Separator();
 
-                ImGui::SliderFloat("normalLength", &app.normalLength, 0.01f, 1.0f);
+                ImGui::SliderFloat3("light dir", &app.lightDir.x, -5.0f, 5.0f);
+                ImGui::SliderFloat("normal length", &app.normalLength, 0.01f, 1.0f);
 
                 ImGui::Separator();
                 ImGui::Checkbox("Turntable", &app.turntable);
@@ -417,7 +445,8 @@ int main(int argc, char **argv) {
                 ImGui::SameLine();
                 ImGui::Text("%s", fpsDisplay);
                 ImGui::Separator();
-                ImGui::TextWrapped("Model: %s", currentFile.c_str());
+                ImGui::TextWrapped("Model: %s", currentObj.c_str());
+                ImGui::TextWrapped("Texture: %s", currentTexture.c_str());
                 ImGui::TextWrapped("Triangles : %lu", app.modelData.faces.size());
                 ImGui::Separator();
             }
@@ -425,8 +454,10 @@ int main(int argc, char **argv) {
             ImGui::Spacing();
             ImGui::Text("Keyboard shortcuts:");
             ImGui::Text("'wasd up/down': move camera");
-            ImGui::Text("'o': open a new file");
+            ImGui::Text("'o': open a new model");
+            ImGui::Text("'t': open a new texture");
             ImGui::Text("'z': show z-buffer");
+            ImGui::Text("'x': show axis");
             ImGui::Text("'q': exit");
 
             ImGui::End();
@@ -448,6 +479,7 @@ int main(int argc, char **argv) {
     cr_plugin_close(ctx);
 
     // Cleanup
+    free(app.pngInfo.image);
     free(app.image.buffer);
     free(app.image.zbuffer);
     destroyImGui();

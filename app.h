@@ -18,6 +18,7 @@ typedef struct App {
     bool isRunning;
     bool turntable;
     float turntableSpeed;
+    glm::vec3 lightDir;
     RenderMode renderMode;
 
     ModelData modelData;

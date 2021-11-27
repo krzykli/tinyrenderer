@@ -101,7 +101,7 @@ glm::vec3 barycentric(glm::vec3 A, glm::vec3 B, glm::vec3 C, glm::vec3 P) {
 /*     } */
 /* } */
 
-unsigned char* samplePngTexture(Png png, float u, float v) {
+unsigned char *samplePngTexture(Png png, float u, float v) {
     u32 width = png.width;
     u32 height = png.height;
     u32 x = width * u;
@@ -111,7 +111,13 @@ unsigned char* samplePngTexture(Png png, float u, float v) {
     return &png.image[offset];
 }
 
-void drawTriangleWithTexture(glm::vec3 t0, glm::vec3 t1, glm::vec3 t2, Image &image, Png png, glm::vec3 *uvs) {
+float linearToSrgb(float theLinearValue) {
+    return theLinearValue <= 0.0031308f ? theLinearValue * 12.92f
+                                        : powf(theLinearValue, 1.0f / 2.4f) * 1.055f - 0.055f;
+}
+
+void drawTriangleWithTexture(glm::vec3 t0, glm::vec3 t1, glm::vec3 t2, Image &image, Png png,
+                             glm::vec3 *uvs, glm::vec3 *normals, glm::vec3 lightDir) {
     int minX = imin(imin(imin(t0.x, t1.x), t2.x), image.width - 1);
     int maxX = imax(imax(imax(t0.x, t1.x), t2.x), 0);
 
@@ -133,6 +139,7 @@ void drawTriangleWithTexture(glm::vec3 t0, glm::vec3 t1, glm::vec3 t2, Image &im
             P.z += t2.z * bc[2];
 
             glm::vec3 uv = bc[0] * uvs[0] + bc[1] * uvs[1] + bc[2] * uvs[2];
+            glm::vec3 normal = bc[0] * normals[0] + bc[1] * normals[1] + bc[2] * normals[2];
 
             u32 width = png.width;
             u32 height = png.height;
@@ -141,11 +148,18 @@ void drawTriangleWithTexture(glm::vec3 t0, glm::vec3 t1, glm::vec3 t2, Image &im
 
             u32 offset = (y * width + x) * 4;
 
-            unsigned char r = png.image[offset];
-            unsigned char g = png.image[offset + 1];
-            unsigned char b = png.image[offset + 2];
-            u32 color = r | g << 8 | b << 16 | (255 << 24);
+            float intensity = glm::dot(glm::vec3(normal), glm::normalize(lightDir));
+            if (intensity < 0)
+                intensity = 0;
 
+            unsigned char r = png.image[offset] * intensity;
+            unsigned char g = png.image[offset + 1] * intensity;
+            unsigned char b = png.image[offset + 2] * intensity;
+            u8 rsrgb = u8(linearToSrgb(r / 255.0f) * 255);
+            u8 gsrgb = u8(linearToSrgb(g / 255.0f) * 255);
+            u8 bsrgb = u8(linearToSrgb(b / 255.0f) * 255);
+
+            u32 color = rsrgb | gsrgb << 8 | bsrgb << 16 | (255 << 24);
             int coord = int(P.x + P.y * image.width);
 
             if (image.zbuffer[coord] < P.z) {

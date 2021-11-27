@@ -55,11 +55,6 @@ void trRender(App *app) {
 
     for (int i = 0; i < app->modelData.faces.size(); i++) {
         Face f = app->modelData.faces[i];
-
-        glm::vec3 uvs0 = f.uvs[0];
-        glm::vec3 uvs1 = f.uvs[1];
-        glm::vec3 uvs2 = f.uvs[2];
-
         glm::vec3 screenCoords[3];
 
         glm::mat4 rotation = glm::rotate(glm::radians(app->rotateY), glm::vec3(0, 1, 0));
@@ -70,25 +65,24 @@ void trRender(App *app) {
         glm::mat4 modelView = view * rotation;
 
         glm::vec3 transformedVertices[3];
+        glm::vec3 transformedNormals[3];
 
         for (int j = 0; j < 3; j++) {
             glm::vec3 v0 = f.verts[j];
             glm::vec4 vertex = glm::vec4(v0.x, v0.y, v0.z, 1);
             glm::vec4 transformedVertex = perspective * modelView * vertex;
             transformedVertices[j] = transformedVertex;
+
+            glm::vec3 n0 = f.normals[j];
+            glm::vec4 normal = glm::vec4(n0.x, n0.y, n0.z, 1);
+            glm::mat4 normalModelMatrix = glm::transpose(glm::inverse(modelView));
+            glm::vec3 transformedNormal = glm::normalize(glm::vec3(normalModelMatrix * normal));
+            transformedNormals[j] = transformedNormal;
+
             screenCoords[j] = glm::project(glm::vec3(vertex), modelView, perspective, viewport);
         }
 
         glm::vec3 normalA = f.normals[0];
-        glm::mat4 modelMatrix = translation * rotation;
-        glm::mat4 normalModelMatrix = glm::transpose(glm::inverse(modelView));
-        glm::vec4 normal = glm::vec4(normalA.x, normalA.y, normalA.z, 1);
-        glm::vec3 transformedNormal = glm::normalize(glm::vec3(normalModelMatrix * normal));
-
-        glm::vec3 lightDir(0, 1, -1);
-        float intensity = glm::dot(glm::vec3(transformedNormal), glm::normalize(lightDir));
-        if (intensity < 0)
-            intensity = 0;
 
         u32 normalColor = int((normalA.x + 1) / 2 * 255) | int((normalA.y + 1) / 2 * 255) << 8 |
                           int((normalA.z + 1) / 2 * 255) << 16 | (0 << 24);
@@ -97,11 +91,14 @@ void trRender(App *app) {
 
         case TRIANGLES: {
 
-            if (png.image != NULL) {
+            if (true) {
+                drawTriangleWithTexture(screenCoords[0], screenCoords[1], screenCoords[2],
+                                        app->image, png, f.uvs, transformedNormals, app->lightDir);
+            } else {
+                float intensity = glm::dot(glm::vec3(transformedNormals[0]), glm::normalize(app->lightDir));
+                if (intensity < 0)
+                    intensity = 0;
 
-                drawTriangleWithTexture(screenCoords[0], screenCoords[1], screenCoords[2], app->image, png, f.uvs);
-            }
-            else {
                 u32 color = int(255 * intensity) | int(255 * intensity) << 8 |
                             int(255 * intensity) << 16 | (0 << 24);
                 drawTriangle(screenCoords[0], screenCoords[1], screenCoords[2], app->image, color);
