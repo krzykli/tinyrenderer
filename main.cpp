@@ -157,6 +157,18 @@ void keyCallback(GLFWwindow *window, int key, int scancode, int action, int mods
 
         switch (key) {
 
+        case GLFW_KEY_1:
+            app.renderMode = TRIANGLES;
+            break;
+
+        case GLFW_KEY_2:
+            app.renderMode = POINTS;
+            break;
+
+        case GLFW_KEY_3:
+            app.renderMode = NORMALS;
+            break;
+
         case GLFW_KEY_SPACE:
             app.displayUI = !app.displayUI;
             break;
@@ -271,6 +283,17 @@ u32 float4ToU32(float *input) {
     int alpha = input[3] * 255;
     u32 output = red | (green << 8) | (blue << 16) | (alpha << 24);
     return output;
+}
+
+const char* getCurrentItemFromCurrentRenderMode() {
+    switch(app.renderMode) {
+        case TRIANGLES:
+            return "Triangles";
+        case POINTS:
+            return "Points";
+        case NORMALS:
+            return "Normals";
+    }
 }
 
 int main(int argc, char **argv) {
@@ -406,7 +429,7 @@ int main(int argc, char **argv) {
 
             ImGui::Begin("TinyRenderer");
             const char *items[] = {"Triangles", "Points", "Normals"};
-            static const char *current_item = "Triangles";
+            const char *current_item = getCurrentItemFromCurrentRenderMode();
 
             if (ImGui::BeginCombo("Render Mode", current_item)) {
                 for (int n = 0; n < IM_ARRAYSIZE(items); n++) {
@@ -418,6 +441,7 @@ int main(int argc, char **argv) {
                 }
                 ImGui::EndCombo();
             }
+
             if (current_item == "Triangles") {
                 app.renderMode = TRIANGLES;
             } else if (current_item == "Points") {
@@ -425,6 +449,7 @@ int main(int argc, char **argv) {
             } else if (current_item == "Normals") {
                 app.renderMode = NORMALS;
             }
+
             if (ImGui::CollapsingHeader("Settings")) {
                 ImGui::Separator();
 
@@ -454,6 +479,7 @@ int main(int argc, char **argv) {
             ImGui::Spacing();
             ImGui::Text("Keyboard shortcuts:");
             ImGui::Text("'wasd up/down': move camera");
+            ImGui::Text("'1,2,3': display modes");
             ImGui::Text("'o': open a new model");
             ImGui::Text("'t': open a new texture");
             ImGui::Text("'z': show z-buffer");
