@@ -29,7 +29,7 @@ App app;
 bool firstMouse = false;
 int mouseButtonDrag = false;
 
-bool showZbuffer = false;
+float zdepthExponent = 0.003f;
 
 int BUFFER_WIDTH = 1280;
 int BUFFER_HEIGHT = 920;
@@ -169,6 +169,10 @@ void keyCallback(GLFWwindow *window, int key, int scancode, int action, int mods
             app.renderMode = NORMALS;
             break;
 
+        case GLFW_KEY_4:
+            app.renderMode = ZBUFFER;
+            break;
+
         case GLFW_KEY_SPACE:
             app.displayUI = !app.displayUI;
             break;
@@ -189,10 +193,6 @@ void keyCallback(GLFWwindow *window, int key, int scancode, int action, int mods
         }
     } else {
         switch (key) {
-
-        case GLFW_KEY_Z:
-            showZbuffer = !showZbuffer;
-            break;
 
         case GLFW_KEY_X:
             app.showAxis = !app.showAxis;
@@ -285,14 +285,16 @@ u32 float4ToU32(float *input) {
     return output;
 }
 
-const char* getCurrentItemFromCurrentRenderMode() {
-    switch(app.renderMode) {
-        case TRIANGLES:
-            return "Triangles";
-        case POINTS:
-            return "Points";
-        case NORMALS:
-            return "Normals";
+const char *getCurrentItemFromCurrentRenderMode() {
+    switch (app.renderMode) {
+    case TRIANGLES:
+        return "Triangles";
+    case POINTS:
+        return "Points";
+    case NORMALS:
+        return "Normals";
+    case ZBUFFER:
+        return "Zbuffer";
     }
 }
 
@@ -348,10 +350,19 @@ int main(int argc, char **argv) {
         double FPS;
 
         if (lockFramerate) {
-            while (timeInMs < 16.666666f) {
-                currentFrame = glfwGetTime();
-                app.deltaTime = currentFrame - lastFrame;
-                timeInMs = app.deltaTime * 1000.0f;
+            if (timeInMs < 16.6666666f)  {
+                while (timeInMs < 16.666666f) {
+                    currentFrame = glfwGetTime();
+                    app.deltaTime = currentFrame - lastFrame;
+                    timeInMs = app.deltaTime * 1000.0f;
+                }
+            }
+            else if (timeInMs > 16.6666666f && timeInMs < 33.333333f)  {
+                while (timeInMs < 33.333333f) {
+                    currentFrame = glfwGetTime();
+                    app.deltaTime = currentFrame - lastFrame;
+                    timeInMs = app.deltaTime * 1000.0f;
+                }
             }
         }
         lastFrame = currentFrame;
@@ -369,7 +380,13 @@ int main(int argc, char **argv) {
         glBindTexture(GL_TEXTURE_2D, renderTextureId);
         glActiveTexture(GL_TEXTURE0);
         glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-        if (showZbuffer) {
+        if (app.renderMode == ZBUFFER) {
+            for (int i = 0; i < app.image.width * app.image.height; i++) {
+                float z = app.image.zbuffer[i];
+                if (z > 0) {
+                    app.image.zbuffer[i] = powf(z, zdepthExponent);
+                }
+            }
             glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, app.image.width, app.image.height, GL_RGBA,
                             GL_UNSIGNED_BYTE, app.image.zbuffer);
         } else {
@@ -417,8 +434,7 @@ int main(int argc, char **argv) {
 
                         loadOBJ(currentObj.c_str(), app.modelData.faces, app.modelData.vertices,
                                 app.modelData.uvs, app.modelData.normals);
-                    }
-                    else if (strstr(path.c_str(), ".png")) {
+                    } else if (strstr(path.c_str(), ".png")) {
                         currentTexture = path;
                         free(app.pngInfo.image);
                         app.pngInfo = loadPNG(path.c_str());
@@ -428,7 +444,7 @@ int main(int argc, char **argv) {
             }
 
             ImGui::Begin("TinyRenderer");
-            const char *items[] = {"Triangles", "Points", "Normals"};
+            const char *items[] = {"Triangles", "Points", "Normals", "Zbuffer"};
             const char *current_item = getCurrentItemFromCurrentRenderMode();
 
             if (ImGui::BeginCombo("Render Mode", current_item)) {
@@ -448,6 +464,8 @@ int main(int argc, char **argv) {
                 app.renderMode = POINTS;
             } else if (current_item == "Normals") {
                 app.renderMode = NORMALS;
+            } else if (current_item == "Zbuffer") {
+                app.renderMode = ZBUFFER;
             }
 
             if (ImGui::CollapsingHeader("Settings")) {
@@ -455,6 +473,7 @@ int main(int argc, char **argv) {
 
                 ImGui::SliderFloat3("light dir", &app.lightDir.x, -5.0f, 5.0f);
                 ImGui::SliderFloat("normal length", &app.normalLength, 0.01f, 1.0f);
+                ImGui::SliderFloat("zdepth exp", &zdepthExponent, 0.001f, 0.015f);
 
                 ImGui::Separator();
                 ImGui::Checkbox("Turntable", &app.turntable);
@@ -479,7 +498,7 @@ int main(int argc, char **argv) {
             ImGui::Spacing();
             ImGui::Text("Keyboard shortcuts:");
             ImGui::Text("'wasd up/down': move camera");
-            ImGui::Text("'1,2,3': display modes");
+            ImGui::Text("'1-4': display modes");
             ImGui::Text("'o': open a new model");
             ImGui::Text("'t': open a new texture");
             ImGui::Text("'z': show z-buffer");

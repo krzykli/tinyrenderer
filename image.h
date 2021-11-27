@@ -125,6 +125,9 @@ void drawTriangleWithTexture(glm::vec3 t0, glm::vec3 t1, glm::vec3 t2, Image &im
     int maxY = imax(imax(imax(t0.y, t1.y), t2.y), 0);
 
     glm::vec3 P;
+    u32 width = png.width;
+    u32 height = png.height;
+
     for (P.x = minX; P.x <= maxX; P.x++) {
         for (P.y = minY; P.y <= maxY; P.y++) {
 
@@ -141,8 +144,6 @@ void drawTriangleWithTexture(glm::vec3 t0, glm::vec3 t1, glm::vec3 t2, Image &im
             glm::vec3 uv = bc[0] * uvs[0] + bc[1] * uvs[1] + bc[2] * uvs[2];
             glm::vec3 normal = bc[0] * normals[0] + bc[1] * normals[1] + bc[2] * normals[2];
 
-            u32 width = png.width;
-            u32 height = png.height;
             u32 x = width * uv.x;
             u32 y = height * uv.y;
 

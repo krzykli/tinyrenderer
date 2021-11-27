@@ -89,6 +89,7 @@ void trRender(App *app) {
 
         switch (app->renderMode) {
 
+        case ZBUFFER:
         case TRIANGLES: {
 
             if (true) {
