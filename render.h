@@ -44,9 +44,11 @@ void trRender(App *app) {
     int width = image.width;
     int height = image.height;
 
-    glm::mat4 view = glm::lookAt(cam.pos, cam.pos + cam.front, glm::vec3(0, 1, 0));
+    glm::mat4 view = glm::lookAt(cam.pos, cam.target, cam.up);
+    float zNear = 0.01f;
+    float zFar = 1000.0f;
     glm::mat4 perspective =
-        glm::perspective(glm::radians(45.0f), width / float(height), 0.01f, 1000.0f);
+        glm::perspectiveLH(cam.fov, width / float(height), 0.01f, 1000.0f);
     glm::vec4 viewport(0.0f, 0.0f, width - 1, height - 1);
 
     if (app->showAxis) {
@@ -61,7 +63,6 @@ void trRender(App *app) {
         glm::mat4 scale = glm::scale(glm::vec3(app->scale, app->scale, app->scale));
         glm::mat4 translation = glm::translate(glm::vec3(app->translateX, app->translateY, 0));
 
-        /* glm::mat4 modelMatrix = translation * scale * rotation; */
         glm::mat4 modelView = view * rotation;
 
         glm::vec3 transformedVertices[3];
@@ -83,6 +84,9 @@ void trRender(App *app) {
         }
 
         glm::vec3 normalA = f.normals[0];
+
+        app->lightDir.y = cos( 2 * glfwGetTime());
+        app->lightDir.x = sin( 2 * glfwGetTime());
 
         u32 normalColor = int((normalA.x + 1) / 2 * 255) | int((normalA.y + 1) / 2 * 255) << 8 |
                           int((normalA.z + 1) / 2 * 255) << 16 | (0 << 24);

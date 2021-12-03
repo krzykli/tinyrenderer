@@ -16,7 +16,7 @@ enum RenderMode { TRIANGLES = 0, POINTS = 1, NORMALS = 2, ZBUFFER = 3 };
 
 typedef struct Camera {
     glm::vec3 pos;
-    glm::vec3 front;
+    glm::vec3 target;
     glm::vec3 up;
     float fov;
 

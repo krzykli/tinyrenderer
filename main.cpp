@@ -96,19 +96,30 @@ struct HostData {
 
 void mouseButtonCallback(GLFWwindow *window, int button, int action, int mods) {
     if (button == GLFW_MOUSE_BUTTON_LEFT) {
-        if (GLFW_PRESS == action)
+        if (GLFW_PRESS == action) {
             mouseButtonDrag = true;
+        }
         else if (GLFW_RELEASE == action)
             mouseButtonDrag = false;
     }
 }
 
 void scrollCallback(GLFWwindow *window, double xoffset, double yoffset) {
+    yoffset = fmin(yoffset, 1.0f);
+    yoffset = fmax(yoffset, -1.3f);
+    glm::vec3 direction = app.camera.pos - app.camera.target;
     float sensitivity = 0.1f;
-    app.camera.pos -= app.camera.front * float(yoffset * sensitivity);
+    glm::vec3 offset = direction * (float)yoffset * sensitivity;
+    glm::vec3 new_pos = app.camera.pos + offset;
+    float distance = glm::distance(new_pos, app.camera.target);
+    if (distance < 1.0f)
+        offset = glm::vec3(0, 0, 0);
+
+    app.camera.pos -= offset;
 }
 
 void cursorCallback(GLFWwindow *window, double xpos, double ypos) {
+
     ImGuiIO &io = ImGui::GetIO();
     if (io.WantCaptureMouse) {
         return;
@@ -126,27 +137,45 @@ void cursorCallback(GLFWwindow *window, double xpos, double ypos) {
     app.lastX = xpos;
     app.lastY = ypos;
 
-    float sensitivity = 0.1f;
+    float sensitivity = 0.01f;
+
+    glm::mat4 view = glm::lookAt(
+        app.camera.pos,
+        app.camera.target,
+        app.camera.up
+    );
 
     if (mouseButtonDrag) {
+        GLFWcursor* cursor = glfwCreateStandardCursor(GLFW_HAND_CURSOR);
+        glfwSetCursor(window, cursor);
 
-        xoffset *= sensitivity;
-        yoffset *= sensitivity;
-
-        app.camera.yaw -= xoffset;
-        app.camera.pitch += yoffset;
-
-        if (app.camera.pitch > 89.0f)
-            app.camera.pitch = 89.0f;
-        if (app.camera.pitch < -89.0f)
-            app.camera.pitch = -89.0f;
-
-        glm::vec3 front;
-        front.x = cos(glm::radians(app.camera.yaw)) * cos(glm::radians(app.camera.pitch));
-        front.y = sin(glm::radians(app.camera.pitch));
-        front.z = sin(glm::radians(app.camera.yaw)) * cos(glm::radians(app.camera.pitch));
-        app.camera.front = glm::normalize(front);
+        float deltaTheta = -xoffset * sensitivity;
+        float deltaPhi = -yoffset * sensitivity;
+        if (deltaTheta)
+        {
+            glm::vec3 pivot = app.camera.target;
+            glm::vec3 axis  = glm::vec3(0, 1, 0);
+            glm::mat4 rotationMatrix = glm::rotate(glm::mat4(1), deltaTheta, axis);
+            view = view * rotationMatrix;
+        }
+        if (deltaPhi)
+        {
+            // To rotate the camera without flipping we need to rotate
+            // it by moving it to origin and resetting it back.
+            glm::vec3 pivot = glm::vec3(view * glm::vec4(app.camera.target, 1.0f));
+            glm::vec3 axis  = glm::vec3(1, 0, 0);
+            glm::mat4 rotationMatrix = glm::rotate(glm::mat4(1), deltaPhi, axis);
+            glm::mat4 rotationWithPivot = glm::translate(glm::mat4(1), pivot) * rotationMatrix * glm::translate(glm::mat4(1), -pivot);
+            // Apply the rotation after the current view
+            view = rotationWithPivot * view;
+        }
     }
+
+    glm::mat4 camera_world = glm::inverse(view);
+    float targetDist = glm::length(app.camera.target - app.camera.pos);
+    app.camera.pos = glm::vec3(camera_world[3]);
+    app.camera.target = app.camera.pos - glm::vec3(camera_world[2]) * targetDist;
+    app.camera.up = glm::vec3(camera_world[1]);
 }
 
 void keyCallback(GLFWwindow *window, int key, int scancode, int action, int mods) {
@@ -207,21 +236,21 @@ void keyCallback(GLFWwindow *window, int key, int scancode, int action, int mods
             break;
 
         case GLFW_KEY_W:
-            app.camera.pos -= cameraSpeed * app.camera.front;
+            app.camera.pos -= cameraSpeed * app.camera.target;
             break;
 
         case GLFW_KEY_S:
-            app.camera.pos += cameraSpeed * app.camera.front;
+            app.camera.pos += cameraSpeed * app.camera.target;
             break;
 
         case GLFW_KEY_A:
             app.camera.pos +=
-                glm::normalize(glm::cross(app.camera.front, app.camera.up)) * cameraSpeed;
+                glm::normalize(glm::cross(app.camera.target, app.camera.up)) * cameraSpeed;
             break;
 
         case GLFW_KEY_D:
             app.camera.pos -=
-                glm::normalize(glm::cross(app.camera.front, app.camera.up)) * cameraSpeed;
+                glm::normalize(glm::cross(app.camera.target, app.camera.up)) * cameraSpeed;
             break;
         }
     }
@@ -238,8 +267,8 @@ void initAppDefaults() {
     app.lastY = BUFFER_HEIGHT / 2.0;
 
     Camera cam;
-    cam.pos = glm::vec3(0, 0, -10);
-    cam.front = glm::vec3(0, 0, -1);
+    cam.pos = glm::vec3(3, 3, 3);
+    cam.target = glm::vec3(0, 0, 0);
     cam.up = glm::vec3(0, 1, 0);
     cam.fov = 45.f;
     cam.yaw =
@@ -250,10 +279,10 @@ void initAppDefaults() {
     app.pngInfo = {};
 
     app.normalLength = 0.1f;
-    app.lightDir = glm::vec3(1, 1, -1);
+    app.lightDir = glm::vec3(1, 1, 1);
 
     app.showAxis = true;
-    app.turntable = true;
+    app.turntable = false;
     app.turntableSpeed = 2;
 
     app.appTitle = "Tiny Renderer";
