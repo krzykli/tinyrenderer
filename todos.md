@@ -1,0 +1,6 @@
+- bugfix for model offscreen zdepth render
+- imgui hot reload
+- draw a grid
+- cleanup of globals/config into app struct
+- multithreading
+- scenegraph / multiple objects

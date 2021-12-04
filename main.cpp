@@ -28,6 +28,7 @@
 App app;
 bool firstMouse = false;
 int mouseButtonDrag = false;
+int middleButtonDrag = false;
 
 float zdepthExponent = 0.003f;
 
@@ -96,19 +97,25 @@ struct HostData {
 
 void mouseButtonCallback(GLFWwindow *window, int button, int action, int mods) {
     if (button == GLFW_MOUSE_BUTTON_LEFT) {
-        if (GLFW_PRESS == action) {
+        if (GLFW_PRESS == action)
             mouseButtonDrag = true;
-        }
         else if (GLFW_RELEASE == action)
             mouseButtonDrag = false;
+    }
+    if (button == GLFW_MOUSE_BUTTON_MIDDLE) {
+        if (GLFW_PRESS == action)
+            middleButtonDrag = true;
+        else if (GLFW_RELEASE == action)
+            middleButtonDrag = false;
     }
 }
 
 void scrollCallback(GLFWwindow *window, double xoffset, double yoffset) {
+    float sensitivity = 0.05f;
+
     yoffset = fmin(yoffset, 1.0f);
     yoffset = fmax(yoffset, -1.3f);
     glm::vec3 direction = app.camera.pos - app.camera.target;
-    float sensitivity = 0.1f;
     glm::vec3 offset = direction * (float)yoffset * sensitivity;
     glm::vec3 new_pos = app.camera.pos + offset;
     float distance = glm::distance(new_pos, app.camera.target);
@@ -169,6 +176,32 @@ void cursorCallback(GLFWwindow *window, double xpos, double ypos) {
             // Apply the rotation after the current view
             view = rotationWithPivot * view;
         }
+    }
+    else if (middleButtonDrag)
+    {
+        glm::vec3 panHorizontal;
+        glm::vec3 panVertical = app.camera.up;
+        glm::vec3 direction = glm::normalize(app.camera.pos - app.camera.target);
+        glm::vec3 right = glm::normalize(glm::cross(glm::vec3(0, 1, 0), direction));
+        if (panVertical.y > 0)
+            panHorizontal = -right;
+        else
+            panHorizontal = right;
+
+        float distance = glm::distance(app.camera.pos, app.camera.target);
+        float sensitivity = distance * 0.001f;
+        float deltaPanH = -xoffset * sensitivity;
+        float deltaPanV = -yoffset * sensitivity;
+
+        glm::vec3 offset = panHorizontal * deltaPanH + panVertical * deltaPanV;
+        app.camera.pos += offset;
+        app.camera.target += offset;
+
+        view = glm::lookAt(
+            app.camera.pos,
+            app.camera.target,
+            app.camera.up
+        );
     }
 
     glm::mat4 camera_world = glm::inverse(view);
@@ -233,24 +266,6 @@ void keyCallback(GLFWwindow *window, int key, int scancode, int action, int mods
 
         case GLFW_KEY_DOWN:
             app.camera.pos -= cameraSpeed * app.camera.up;
-            break;
-
-        case GLFW_KEY_W:
-            app.camera.pos -= cameraSpeed * app.camera.target;
-            break;
-
-        case GLFW_KEY_S:
-            app.camera.pos += cameraSpeed * app.camera.target;
-            break;
-
-        case GLFW_KEY_A:
-            app.camera.pos +=
-                glm::normalize(glm::cross(app.camera.target, app.camera.up)) * cameraSpeed;
-            break;
-
-        case GLFW_KEY_D:
-            app.camera.pos -=
-                glm::normalize(glm::cross(app.camera.target, app.camera.up)) * cameraSpeed;
             break;
         }
     }
@@ -526,7 +541,9 @@ int main(int argc, char **argv) {
 
             ImGui::Spacing();
             ImGui::Text("Keyboard shortcuts:");
-            ImGui::Text("'wasd up/down': move camera");
+            ImGui::Text("'left mouse': orbit");
+            ImGui::Text("'middle mouse': pan");
+            ImGui::Text("'scroll mouse': zoom");
             ImGui::Text("'1-4': display modes");
             ImGui::Text("'o': open a new model");
             ImGui::Text("'t': open a new texture");
