@@ -16,7 +16,7 @@ void drawPixel(u32 x, u32 y, u32 color, Image &image) {
     }
 }
 
-void drawLine(glm::vec2 v0, glm::vec2 v1, Image &image, u32 color) {
+void drawLine(glm::vec3 v0, glm::vec3 v1, Image &image, u32 color) {
 
     int x0 = v0.x;
     int y0 = v0.y;

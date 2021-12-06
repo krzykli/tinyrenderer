@@ -24,9 +24,9 @@ void drawAxis(glm::mat4 view, glm::mat4 perspective, glm::vec4 viewport, Image i
     glm::vec3 projectedyAxis = glm::project(yAxis, view, perspective, viewport);
     glm::vec3 projectedzAxis = glm::project(zAxis, view, perspective, viewport);
 
-    drawLine(glm::vec2(projectedOrigin), glm::vec2(projectedxAxis), image, RED);
-    drawLine(glm::vec2(projectedOrigin), glm::vec2(projectedyAxis), image, GREEN);
-    drawLine(glm::vec2(projectedOrigin), glm::vec2(projectedzAxis), image, BLUE);
+    drawLine(projectedOrigin, projectedxAxis, image, RED);
+    drawLine(projectedOrigin, projectedyAxis, image, GREEN);
+    drawLine(projectedOrigin, projectedzAxis, image, BLUE);
 }
 
 void trRender(App *app) {

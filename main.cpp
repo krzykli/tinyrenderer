@@ -27,7 +27,7 @@
 
 App app;
 bool firstMouse = false;
-int mouseButtonDrag = false;
+int leftButtonDrag = false;
 int middleButtonDrag = false;
 
 float zdepthExponent = 0.003f;
@@ -36,6 +36,96 @@ int BUFFER_WIDTH = 1280;
 int BUFFER_HEIGHT = 920;
 
 const char *plugin = CR_PLUGIN("imalive");
+
+inline void Style() {
+    /// 0 = FLAT APPEARENCE
+    /// 1 = MORE "3D" LOOK
+    int is3D = 1;
+    ImGui::GetIO().Fonts->AddFontFromFileTTF("../fonts/hackNerd.ttf", 13.0f);
+
+    ImVec4 *colors = ImGui::GetStyle().Colors;
+
+    ImVec4 darkBlue = ImVec4(0.1f, 0.3f, 0.7f, 0.54f);
+    ImVec4 brightBlue = ImVec4(0.2f, 0.6f, 0.8f, 0.54f);
+
+    colors[ImGuiCol_Text] = ImVec4(1.00f, 1.00f, 1.00f, 1.00f);
+    colors[ImGuiCol_TextDisabled] = ImVec4(0.50f, 0.50f, 0.50f, 1.00f);
+    colors[ImGuiCol_WindowBg] = ImVec4(0.10f, 0.10f, 0.10f, 1.00f);
+    colors[ImGuiCol_ChildBg] = ImVec4(0.00f, 0.00f, 0.00f, 0.00f);
+    colors[ImGuiCol_PopupBg] = ImVec4(0.19f, 0.19f, 0.19f, 0.92f);
+    colors[ImGuiCol_Border] = ImVec4(0.19f, 0.19f, 0.19f, 0.29f);
+    colors[ImGuiCol_BorderShadow] = ImVec4(0.00f, 0.00f, 0.00f, 0.24f);
+    colors[ImGuiCol_FrameBg] = ImVec4(0.05f, 0.05f, 0.05f, 0.54f);
+    colors[ImGuiCol_FrameBgHovered] = ImVec4(0.19f, 0.19f, 0.19f, 0.54f);
+    colors[ImGuiCol_FrameBgActive] = ImVec4(0.20f, 0.22f, 0.23f, 1.00f);
+    colors[ImGuiCol_TitleBg] = ImVec4(0.00f, 0.00f, 0.00f, 1.00f);
+    colors[ImGuiCol_TitleBgActive] = ImVec4(0.06f, 0.06f, 0.06f, 1.00f);
+    colors[ImGuiCol_TitleBgCollapsed] = ImVec4(0.00f, 0.00f, 0.00f, 1.00f);
+    colors[ImGuiCol_MenuBarBg] = ImVec4(0.14f, 0.14f, 0.14f, 1.00f);
+    colors[ImGuiCol_ScrollbarBg] = ImVec4(0.05f, 0.05f, 0.05f, 0.54f);
+    colors[ImGuiCol_ScrollbarGrab] = ImVec4(0.34f, 0.34f, 0.34f, 0.54f);
+    colors[ImGuiCol_ScrollbarGrabHovered] = ImVec4(0.40f, 0.40f, 0.40f, 0.54f);
+    colors[ImGuiCol_ScrollbarGrabActive] = ImVec4(0.56f, 0.56f, 0.56f, 0.54f);
+    colors[ImGuiCol_CheckMark] = brightBlue;
+    colors[ImGuiCol_SliderGrab] = brightBlue;
+    colors[ImGuiCol_SliderGrabActive] = ImVec4(0.33f, 0.70f, 0.90f, 1.00f);
+    colors[ImGuiCol_Button] = ImVec4(0.05f, 0.05f, 0.05f, 0.54f);
+    colors[ImGuiCol_ButtonHovered] = ImVec4(0.19f, 0.19f, 0.19f, 0.54f);
+    colors[ImGuiCol_ButtonActive] = ImVec4(0.20f, 0.22f, 0.23f, 1.00f);
+    colors[ImGuiCol_Header] = ImVec4(0.00f, 0.00f, 0.00f, 1.f);
+    colors[ImGuiCol_HeaderHovered] = brightBlue;
+    colors[ImGuiCol_HeaderActive] = darkBlue;
+    colors[ImGuiCol_Separator] = ImVec4(0.28f, 0.28f, 0.28f, 0.29f);
+    colors[ImGuiCol_SeparatorHovered] = ImVec4(0.44f, 0.44f, 0.44f, 0.29f);
+    colors[ImGuiCol_SeparatorActive] = ImVec4(0.40f, 0.44f, 0.47f, 1.00f);
+    colors[ImGuiCol_ResizeGrip] = ImVec4(0.28f, 0.28f, 0.28f, 0.29f);
+    colors[ImGuiCol_ResizeGripHovered] = ImVec4(0.44f, 0.44f, 0.44f, 0.29f);
+    colors[ImGuiCol_ResizeGripActive] = ImVec4(0.40f, 0.44f, 0.47f, 1.00f);
+    colors[ImGuiCol_Tab] = ImVec4(0.00f, 0.00f, 0.00f, 0.52f);
+    colors[ImGuiCol_TabHovered] = ImVec4(0.14f, 0.14f, 0.14f, 1.00f);
+    colors[ImGuiCol_TabActive] = ImVec4(0.20f, 0.20f, 0.20f, 0.36f);
+    colors[ImGuiCol_TabUnfocused] = ImVec4(0.00f, 0.00f, 0.00f, 0.52f);
+    colors[ImGuiCol_TabUnfocusedActive] = ImVec4(0.14f, 0.14f, 0.14f, 1.00f);
+    colors[ImGuiCol_PlotLines] = ImVec4(1.00f, 0.00f, 0.00f, 1.00f);
+    colors[ImGuiCol_PlotLinesHovered] = ImVec4(1.00f, 0.00f, 0.00f, 1.00f);
+    colors[ImGuiCol_PlotHistogram] = ImVec4(1.00f, 0.00f, 0.00f, 1.00f);
+    colors[ImGuiCol_PlotHistogramHovered] = ImVec4(1.00f, 0.00f, 0.00f, 1.00f);
+    colors[ImGuiCol_TableHeaderBg] = ImVec4(0.00f, 0.00f, 0.00f, 0.52f);
+    colors[ImGuiCol_TableBorderStrong] = ImVec4(0.00f, 0.00f, 0.00f, 0.52f);
+    colors[ImGuiCol_TableBorderLight] = ImVec4(0.28f, 0.28f, 0.28f, 0.29f);
+    colors[ImGuiCol_TableRowBg] = ImVec4(0.00f, 0.00f, 0.00f, 0.00f);
+    colors[ImGuiCol_TableRowBgAlt] = ImVec4(1.00f, 1.00f, 1.00f, 0.06f);
+    colors[ImGuiCol_TextSelectedBg] = ImVec4(0.20f, 0.22f, 0.23f, 1.00f);
+    colors[ImGuiCol_DragDropTarget] = ImVec4(0.33f, 0.67f, 0.86f, 1.00f);
+    colors[ImGuiCol_NavHighlight] = ImVec4(1.00f, 0.00f, 0.00f, 1.00f);
+    colors[ImGuiCol_NavWindowingHighlight] = ImVec4(1.00f, 0.00f, 0.00f, 0.70f);
+    colors[ImGuiCol_NavWindowingDimBg] = ImVec4(1.00f, 0.00f, 0.00f, 0.20f);
+    colors[ImGuiCol_ModalWindowDimBg] = ImVec4(1.00f, 0.00f, 0.00f, 0.35f);
+
+    ImGuiStyle &style = ImGui::GetStyle();
+    style.WindowPadding = ImVec2(8.00f, 8.00f);
+    style.FramePadding = ImVec2(5.00f, 2.00f);
+    style.CellPadding = ImVec2(6.00f, 6.00f);
+    style.ItemSpacing = ImVec2(6.00f, 6.00f);
+    style.ItemInnerSpacing = ImVec2(6.00f, 6.00f);
+    style.TouchExtraPadding = ImVec2(0.00f, 0.00f);
+    style.IndentSpacing = 25;
+    style.ScrollbarSize = 15;
+    style.GrabMinSize = 10;
+    style.WindowBorderSize = 1;
+    style.ChildBorderSize = 1;
+    style.PopupBorderSize = 1;
+    style.FrameBorderSize = 1;
+    style.TabBorderSize = 1;
+    style.WindowRounding = 7;
+    style.ChildRounding = 4;
+    style.FrameRounding = 3;
+    style.PopupRounding = 4;
+    style.ScrollbarRounding = 9;
+    style.GrabRounding = 3;
+    style.LogSliderDeadzone = 4;
+    style.TabRounding = 4;
+}
 
 void clearImage(Image &image) {
     for (int i = 0; i < image.width * image.height; i++) {
@@ -98,9 +188,9 @@ struct HostData {
 void mouseButtonCallback(GLFWwindow *window, int button, int action, int mods) {
     if (button == GLFW_MOUSE_BUTTON_LEFT) {
         if (GLFW_PRESS == action)
-            mouseButtonDrag = true;
+            leftButtonDrag = true;
         else if (GLFW_RELEASE == action)
-            mouseButtonDrag = false;
+            leftButtonDrag = false;
     }
     if (button == GLFW_MOUSE_BUTTON_MIDDLE) {
         if (GLFW_PRESS == action)
@@ -146,39 +236,32 @@ void cursorCallback(GLFWwindow *window, double xpos, double ypos) {
 
     float sensitivity = 0.01f;
 
-    glm::mat4 view = glm::lookAt(
-        app.camera.pos,
-        app.camera.target,
-        app.camera.up
-    );
+    glm::mat4 view = glm::lookAt(app.camera.pos, app.camera.target, app.camera.up);
 
-    if (mouseButtonDrag) {
-        GLFWcursor* cursor = glfwCreateStandardCursor(GLFW_HAND_CURSOR);
+    if (leftButtonDrag) {
+        GLFWcursor *cursor = glfwCreateStandardCursor(GLFW_HAND_CURSOR);
         glfwSetCursor(window, cursor);
 
         float deltaTheta = -xoffset * sensitivity;
         float deltaPhi = -yoffset * sensitivity;
-        if (deltaTheta)
-        {
+        if (deltaTheta) {
             glm::vec3 pivot = app.camera.target;
-            glm::vec3 axis  = glm::vec3(0, 1, 0);
+            glm::vec3 axis = glm::vec3(0, 1, 0);
             glm::mat4 rotationMatrix = glm::rotate(glm::mat4(1), deltaTheta, axis);
             view = view * rotationMatrix;
         }
-        if (deltaPhi)
-        {
+        if (deltaPhi) {
             // To rotate the camera without flipping we need to rotate
             // it by moving it to origin and resetting it back.
             glm::vec3 pivot = glm::vec3(view * glm::vec4(app.camera.target, 1.0f));
-            glm::vec3 axis  = glm::vec3(1, 0, 0);
+            glm::vec3 axis = glm::vec3(1, 0, 0);
             glm::mat4 rotationMatrix = glm::rotate(glm::mat4(1), deltaPhi, axis);
-            glm::mat4 rotationWithPivot = glm::translate(glm::mat4(1), pivot) * rotationMatrix * glm::translate(glm::mat4(1), -pivot);
+            glm::mat4 rotationWithPivot = glm::translate(glm::mat4(1), pivot) * rotationMatrix *
+                                          glm::translate(glm::mat4(1), -pivot);
             // Apply the rotation after the current view
             view = rotationWithPivot * view;
         }
-    }
-    else if (middleButtonDrag)
-    {
+    } else if (middleButtonDrag) {
         glm::vec3 panHorizontal;
         glm::vec3 panVertical = app.camera.up;
         glm::vec3 direction = glm::normalize(app.camera.pos - app.camera.target);
@@ -197,11 +280,7 @@ void cursorCallback(GLFWwindow *window, double xpos, double ypos) {
         app.camera.pos += offset;
         app.camera.target += offset;
 
-        view = glm::lookAt(
-            app.camera.pos,
-            app.camera.target,
-            app.camera.up
-        );
+        view = glm::lookAt(app.camera.pos, app.camera.target, app.camera.up);
     }
 
     glm::mat4 camera_world = glm::inverse(view);
@@ -308,7 +387,7 @@ void initImGui(GLFWwindow *window) {
     IMGUI_CHECKVERSION();
     ImGui::CreateContext();
     ImGuiIO &io = ImGui::GetIO();
-    ImGui::StyleColorsDark();
+    Style();
 
     ImGui_ImplGlfw_InitForOpenGL(window, true);
     ImGui_ImplOpenGL3_Init("#version 330");
@@ -394,14 +473,13 @@ int main(int argc, char **argv) {
         double FPS;
 
         if (lockFramerate) {
-            if (timeInMs < 16.6666666f)  {
+            if (timeInMs < 16.6666666f) {
                 while (timeInMs < 16.666666f) {
                     currentFrame = glfwGetTime();
                     app.deltaTime = currentFrame - lastFrame;
                     timeInMs = app.deltaTime * 1000.0f;
                 }
-            }
-            else if (timeInMs > 16.6666666f && timeInMs < 33.333333f)  {
+            } else if (timeInMs > 16.6666666f && timeInMs < 33.333333f) {
                 while (timeInMs < 33.333333f) {
                     currentFrame = glfwGetTime();
                     app.deltaTime = currentFrame - lastFrame;
