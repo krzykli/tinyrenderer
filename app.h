@@ -21,7 +21,6 @@ typedef struct App {
     glm::vec3 lightDir;
     RenderMode renderMode;
 
-    ModelData modelData;
     Png pngInfo;
 
     float translateX;
@@ -30,6 +29,8 @@ typedef struct App {
     float scale;
 
     double deltaTime;
+
+    World* world;
 
     const char *appTitle;
 } App;

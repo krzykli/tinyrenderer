@@ -1,9 +1,9 @@
 #ifndef __TYPES_H__
 #define __TYPES_H__
 
+#include <glm/gtx/transform.hpp>
 #include <stdint.h>
 #include <vector>
-#include <glm/gtx/transform.hpp>
 
 #define persist static
 
@@ -34,24 +34,35 @@ typedef struct Image {
 } Image;
 
 typedef struct {
-  glm::vec3 verts[3];
-  glm::vec3 normals[3];
-  glm::vec3 uvs[3];
+    glm::vec3 verts[3];
+    glm::vec3 normals[3];
+    glm::vec3 uvs[3];
 } Face;
 
-typedef struct ModelData{
-    std::vector<Face> faces;
-    std::vector<glm::vec3> vertices;
-    std::vector<glm::vec3> uvs;
-    std::vector<glm::vec3> normals;
-} ModelData;
-
-
 typedef struct Png {
-    unsigned char* image;
+    unsigned char *image;
     unsigned width;
     unsigned height;
 } Png;
 
+typedef struct Node {
+    struct Node* parent;
+    struct std::vector<Node*> children;
+    char const* name;
+    char const* type;
+} Node;
+
+typedef struct World {
+    Node* worldRoot;
+} World;
+
+typedef struct Shape {
+    Node node;
+
+    std::vector<Face> faces;
+    std::vector<glm::vec3> vertices;
+    std::vector<glm::vec3> uvs;
+    std::vector<glm::vec3> normals;
+} Shape;
 
 #endif // __TYPES_H__

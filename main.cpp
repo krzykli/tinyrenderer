@@ -22,6 +22,7 @@
 #include "debug.h"
 #include "obj-model.h"
 #include "opengl-helpers.h"
+#include "scenegraph.h"
 #include "thirdparty/lodepng/lodepng.h"
 #include "types.h"
 
@@ -41,7 +42,7 @@ inline void Style() {
     /// 0 = FLAT APPEARENCE
     /// 1 = MORE "3D" LOOK
     int is3D = 1;
-    ImGui::GetIO().Fonts->AddFontFromFileTTF("../fonts/hackNerd.ttf", 13.0f);
+    ImGui::GetIO().Fonts->AddFontFromFileTTF("../fonts/hackNerd.ttf", 15.0f);
 
     ImVec4 *colors = ImGui::GetStyle().Colors;
 
@@ -173,17 +174,6 @@ void flipImageVertically(Image &image) {
 
     free(tempRowZdepth);
 }
-
-struct HostData {
-    int w, h;
-    int display_w, display_h;
-    ImGuiContext *imgui_context = nullptr;
-    void *wndh = nullptr;
-
-    // GLFW input/time data feed to guest
-    double timestep = 0.0;
-    float mouseWheel = 0.0f;
-};
 
 void mouseButtonCallback(GLFWwindow *window, int button, int action, int mods) {
     if (button == GLFW_MOUSE_BUTTON_LEFT) {
@@ -421,6 +411,24 @@ const char *getCurrentItemFromCurrentRenderMode() {
     }
 }
 
+void buildTree_r(Node *root) {
+    std::vector<Node *> children = root->children;
+    int childrenCount = children.size();
+    if (!childrenCount) {
+        ImGui::Indent();
+        ImGui::Text(root->name);
+        ImGui::Unindent();
+        return;
+    }
+    if (ImGui::TreeNodeEx(root->name)) {
+        for (int i = 0; i < childrenCount; i++) {
+            Node *child = (Node *)children[i];
+            buildTree_r(child);
+        }
+        ImGui::TreePop();
+    }
+}
+
 int main(int argc, char **argv) {
     initAppDefaults();
     GLFWwindow *window = initGLWindow(app.resolutionX, app.resolutionY, app.appTitle);
@@ -452,10 +460,49 @@ int main(int argc, char **argv) {
     double lastFrame = currentFrame;
     bool lockFramerate = true;
     char fpsDisplay[12];
+    //
+    Node worldRoot;
+    worldRoot.parent = NULL;
+    worldRoot.children = std::vector<Node *>();
+    worldRoot.name = "root";
+    worldRoot.type = "transform";
+
+    World world;
+    world.worldRoot = &worldRoot;
+    app.world = &world;
 
     std::string currentObj("../obj/african_head.obj");
-    loadOBJ(currentObj.c_str(), app.modelData.faces, app.modelData.vertices, app.modelData.uvs,
-            app.modelData.normals);
+
+    Node shapeNode;
+    shapeNode.name = "african_head";
+    shapeNode.type = "shape";
+    shapeNode.children = std::vector<Node *>();
+
+    Node transform;
+    transform.name = "group_one";
+    transform.type = "transform";
+    transform.children = std::vector<Node *>();
+
+    Node transform2;
+    transform2.name = "f16";
+    transform2.type = "shape";
+    transform2.children = std::vector<Node *>();
+
+    transform.children.push_back(&transform2);
+
+    Shape modelData;
+    modelData.node = shapeNode;
+    loadOBJ(currentObj.c_str(), modelData.faces, modelData.vertices, modelData.uvs,
+            modelData.normals);
+
+    Shape secondModel;
+    secondModel.node = transform2;
+    loadOBJ("../obj/f16.obj", secondModel.faces, secondModel.vertices, secondModel.uvs,
+            secondModel.normals);
+
+    shapeNode.parent = &worldRoot;
+    worldRoot.children.push_back((Node *)&modelData);
+    worldRoot.children.push_back((Node *)&secondModel);
 
     std::string currentTexture("../textures/african_head_diffuse.png");
     app.pngInfo = loadPNG(currentTexture.c_str());
@@ -543,29 +590,34 @@ int main(int argc, char **argv) {
                 ImGui::EndMainMenuBar();
             }
 
-            if (ImGuiFileDialog::Instance()->Display("ChooseFileDlgKey")) {
+            /* if (ImGuiFileDialog::Instance()->Display("ChooseFileDlgKey")) { */
 
-                if (ImGuiFileDialog::Instance()->IsOk()) {
-                    std::string path = ImGuiFileDialog::Instance()->GetFilePathName();
-                    if (strstr(path.c_str(), ".obj")) {
-                        currentObj = path;
-                        app.modelData.faces.clear();
-                        app.modelData.vertices.clear();
-                        app.modelData.uvs.clear();
-                        app.modelData.normals.clear();
+            /*     if (ImGuiFileDialog::Instance()->IsOk()) { */
+            /*         std::string path = ImGuiFileDialog::Instance()->GetFilePathName(); */
+            /*         if (strstr(path.c_str(), ".obj")) { */
+            /*             currentObj = path; */
+            /*             modelData.faces.clear(); */
+            /*             modelData.vertices.clear(); */
+            /*             modelData.uvs.clear(); */
+            /*             modelData.normals.clear(); */
 
-                        loadOBJ(currentObj.c_str(), app.modelData.faces, app.modelData.vertices,
-                                app.modelData.uvs, app.modelData.normals);
-                    } else if (strstr(path.c_str(), ".png")) {
-                        currentTexture = path;
-                        free(app.pngInfo.image);
-                        app.pngInfo = loadPNG(path.c_str());
-                    }
-                }
-                ImGuiFileDialog::Instance()->Close();
-            }
+            /*             loadOBJ(currentObj.c_str(), modelData.faces, modelData.vertices, */
+            /*                     modelData.uvs, app.modelData.normals); */
+            /*         } else if (strstr(path.c_str(), ".png")) { */
+            /*             currentTexture = path; */
+            /*             free(app.pngInfo.image); */
+            /*             app.pngInfo = loadPNG(path.c_str()); */
+            /*         } */
+            /*     } */
+            /*     ImGuiFileDialog::Instance()->Close(); */
+            /* } */
+
+            ImGui::Begin("Scene Graph");
+            buildTree_r(&worldRoot);
+            ImGui::End();
 
             ImGui::Begin("TinyRenderer");
+
             const char *items[] = {"Triangles", "Points", "Normals", "Zbuffer"};
             const char *current_item = getCurrentItemFromCurrentRenderMode();
 
@@ -580,13 +632,13 @@ int main(int argc, char **argv) {
                 ImGui::EndCombo();
             }
 
-            if (current_item == "Triangles") {
+            if (!strcmp(current_item, "Triangles")) {
                 app.renderMode = TRIANGLES;
-            } else if (current_item == "Points") {
+            } else if (!strcmp(current_item, "Points")) {
                 app.renderMode = POINTS;
-            } else if (current_item == "Normals") {
+            } else if (!strcmp(current_item, "Normals")) {
                 app.renderMode = NORMALS;
-            } else if (current_item == "Zbuffer") {
+            } else if (!strcmp(current_item, "Zbuffer")) {
                 app.renderMode = ZBUFFER;
             }
 
@@ -613,7 +665,7 @@ int main(int argc, char **argv) {
                 ImGui::Separator();
                 ImGui::TextWrapped("Model: %s", currentObj.c_str());
                 ImGui::TextWrapped("Texture: %s", currentTexture.c_str());
-                ImGui::TextWrapped("Triangles : %lu", app.modelData.faces.size());
+                /* ImGui::TextWrapped("Triangles : %lu", app.modelData.faces.size()); */
                 ImGui::Separator();
             }
 
@@ -630,6 +682,7 @@ int main(int argc, char **argv) {
             ImGui::Text("'q': exit");
 
             ImGui::End();
+            /* ImGui::ShowDemoWindow(true); */
 
             ImGui::EndFrame();
             ImGui::Render();
