@@ -365,7 +365,7 @@ void initAppDefaults() {
     app.normalLength = 0.1f;
     app.lightDir = glm::vec3(1, 1, 1);
 
-    app.showAxis = true;
+    app.showAxis = false;
     app.turntable = false;
     app.turntableSpeed = 2;
 
@@ -479,14 +479,14 @@ int main(int argc, char **argv) {
     t1.node.children = std::vector<Node *>();
     t1.node.name = "african_head_root";
     t1.node.type = "transform";
-    t1.matrix = glm::mat4(1);
+    t1.matrix = glm::translate(glm::mat4(1), glm::vec3(0.0f, 0.0f, 0.0f));
 
     Shape shape;
+    shape.node.parent = (Node *)&t1;
     shape.node.name = "african_head";
     shape.node.type = "shape";
     shape.node.children = std::vector<Node *>();
-    loadOBJ(currentObj.c_str(), shape.faces, shape.vertices, shape.uvs,
-            shape.normals);
+    loadOBJ(currentObj.c_str(), shape.faces, shape.vertices, shape.uvs, shape.normals);
     t1.node.children.push_back((Node *)&shape);
 
     Transform t2;
@@ -494,19 +494,36 @@ int main(int argc, char **argv) {
     t2.node.children = std::vector<Node *>();
     t2.node.name = "f16_root";
     t2.node.type = "transform";
-    t2.matrix = glm::mat4(1);
+    t2.matrix = glm::translate(glm::mat4(1), glm::vec3(2.0f, 0.0f, 0.0f));
 
     Shape shapeF16;
+    shapeF16.node.parent = (Node *)&t2;
     shapeF16.node.name = "f16";
     shapeF16.node.type = "shape";
     shapeF16.node.children = std::vector<Node *>();
-    loadOBJ("../obj/f16.obj", shapeF16.faces, shapeF16.vertices, shapeF16.uvs,
-            shapeF16.normals);
+    loadOBJ("../obj/f16.obj", shapeF16.faces, shapeF16.vertices, shapeF16.uvs, shapeF16.normals);
     t2.node.children.push_back((Node *)&shapeF16);
+
+    Transform t3;
+    t3.node.parent = &worldRoot;
+    t3.node.children = std::vector<Node *>();
+    t3.node.name = "armadillo_root";
+    t3.node.type = "transform";
+    glm::mat4 rotation = glm::rotate(glm::radians(90.1f), glm::vec3(0, 1, 0));
+    t3.matrix = glm::translate(glm::mat4(1), glm::vec3(-2.0f, 0.0f, 0.0f)) * rotation;
+
+    Shape armadilloShape;
+    armadilloShape.node.parent = (Node *)&t3;
+    armadilloShape.node.name = "armadillo";
+    armadilloShape.node.type = "shape";
+    armadilloShape.node.children = std::vector<Node *>();
+    loadOBJ("../obj/armadillo.obj", armadilloShape.faces, armadilloShape.vertices, armadilloShape.uvs, armadilloShape.normals);
+    t3.node.children.push_back((Node *)&armadilloShape);
 
     shape.node.parent = &worldRoot;
     worldRoot.children.push_back((Node *)&t1);
     worldRoot.children.push_back((Node *)&t2);
+    worldRoot.children.push_back((Node *)&t3);
 
     std::string currentTexture("../textures/african_head_diffuse.png");
     app.pngInfo = loadPNG(currentTexture.c_str());

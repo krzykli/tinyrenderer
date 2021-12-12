@@ -10,7 +10,7 @@
 #include "types.h"
 #include <GLFW/glfw3.h>
 #include <glm/gtx/transform.hpp>
-
+#include <glm/gtx/matrix_decompose.hpp>
 #include <glm/gtx/string_cast.hpp>
 
 void drawAxis(glm::mat4 view, glm::mat4 perspective, glm::vec4 viewport, Image image) {
@@ -29,9 +29,16 @@ void drawAxis(glm::mat4 view, glm::mat4 perspective, glm::vec4 viewport, Image i
     drawLine(projectedOrigin, projectedzAxis, image, BLUE);
 }
 
-void renderShape(Shape modelData, glm::mat4 perspective, glm::mat4 view, glm::vec4 viewport,
-                 App *app) {
+void renderShape(Node *node, glm::mat4 perspective, glm::mat4 view, glm::vec4 viewport, App *app) {
 
+    glm::mat4 parentWorldMatrix = glm::mat4(1);
+    Node *parentNode = node->parent;
+    if (!strcmp(parentNode->type, "transform")) {
+        Transform transform = *(Transform *)parentNode;
+        parentWorldMatrix = transform.matrix;
+    }
+
+    Shape modelData = *(Shape *)node;
     Png png = app->pngInfo;
     for (int i = 0; i < modelData.faces.size(); i++) {
         Face f = modelData.faces[i];
@@ -41,7 +48,7 @@ void renderShape(Shape modelData, glm::mat4 perspective, glm::mat4 view, glm::ve
         glm::mat4 scale = glm::scale(glm::vec3(app->scale, app->scale, app->scale));
         glm::mat4 translation = glm::translate(glm::vec3(app->translateX, app->translateY, 0));
 
-        glm::mat4 modelView = view * rotation;
+        glm::mat4 modelView = view * parentWorldMatrix * rotation;
 
         glm::vec3 transformedVertices[3];
         glm::vec3 transformedNormals[3];
@@ -107,13 +114,13 @@ void renderShape(Shape modelData, glm::mat4 perspective, glm::mat4 view, glm::ve
     }
 }
 
-void renderWorld_r(Node *root, App *app, glm::mat4 perspective, glm::mat4 view, glm::vec4 viewport) {
+void renderWorld_r(Node *root, App *app, glm::mat4 perspective, glm::mat4 view,
+                   glm::vec4 viewport) {
     std::vector<Node *> children = root->children;
     for (int i = 0; i < children.size(); i++) {
         Node *child = children[i];
         if (!strcmp(child->type, "shape")) {
-            Shape cast = *(Shape*)child;
-            renderShape(cast, perspective, view, viewport, app);
+            renderShape(child, perspective, view, viewport, app);
         }
         renderWorld_r(child, app, perspective, view, viewport);
     }
@@ -143,7 +150,7 @@ void trRender(App *app) {
         drawAxis(view, perspective, viewport, image);
     }
 
-    Node* root = app->world->worldRoot;
+    Node *root = app->world->worldRoot;
     renderWorld_r(root, app, perspective, view, viewport);
 }
 
