@@ -416,7 +416,7 @@ void buildTree_r(Node *root) {
     int childrenCount = children.size();
     if (!childrenCount) {
         ImGui::Indent();
-        ImGui::Text(root->name);
+        ImGui::Text("%s", root->name);
         ImGui::Unindent();
         return;
     }
@@ -461,11 +461,12 @@ int main(int argc, char **argv) {
     bool lockFramerate = true;
     char fpsDisplay[12];
     //
+
     Node worldRoot;
     worldRoot.parent = NULL;
     worldRoot.children = std::vector<Node *>();
-    worldRoot.name = "root";
-    worldRoot.type = "transform";
+    worldRoot.name = "world";
+    worldRoot.type = "root";
 
     World world;
     world.worldRoot = &worldRoot;
@@ -473,36 +474,39 @@ int main(int argc, char **argv) {
 
     std::string currentObj("../obj/african_head.obj");
 
-    Node shapeNode;
-    shapeNode.name = "african_head";
-    shapeNode.type = "shape";
-    shapeNode.children = std::vector<Node *>();
+    Transform t1;
+    t1.node.parent = &worldRoot;
+    t1.node.children = std::vector<Node *>();
+    t1.node.name = "african_head_root";
+    t1.node.type = "transform";
+    t1.matrix = glm::mat4(1);
 
-    Node transform;
-    transform.name = "group_one";
-    transform.type = "transform";
-    transform.children = std::vector<Node *>();
+    Shape shape;
+    shape.node.name = "african_head";
+    shape.node.type = "shape";
+    shape.node.children = std::vector<Node *>();
+    loadOBJ(currentObj.c_str(), shape.faces, shape.vertices, shape.uvs,
+            shape.normals);
+    t1.node.children.push_back((Node *)&shape);
 
-    Node transform2;
-    transform2.name = "f16";
-    transform2.type = "shape";
-    transform2.children = std::vector<Node *>();
+    Transform t2;
+    t2.node.parent = &worldRoot;
+    t2.node.children = std::vector<Node *>();
+    t2.node.name = "f16_root";
+    t2.node.type = "transform";
+    t2.matrix = glm::mat4(1);
 
-    transform.children.push_back(&transform2);
+    Shape shapeF16;
+    shapeF16.node.name = "f16";
+    shapeF16.node.type = "shape";
+    shapeF16.node.children = std::vector<Node *>();
+    loadOBJ("../obj/f16.obj", shapeF16.faces, shapeF16.vertices, shapeF16.uvs,
+            shapeF16.normals);
+    t2.node.children.push_back((Node *)&shapeF16);
 
-    Shape modelData;
-    modelData.node = shapeNode;
-    loadOBJ(currentObj.c_str(), modelData.faces, modelData.vertices, modelData.uvs,
-            modelData.normals);
-
-    Shape secondModel;
-    secondModel.node = transform2;
-    loadOBJ("../obj/f16.obj", secondModel.faces, secondModel.vertices, secondModel.uvs,
-            secondModel.normals);
-
-    shapeNode.parent = &worldRoot;
-    worldRoot.children.push_back((Node *)&modelData);
-    worldRoot.children.push_back((Node *)&secondModel);
+    shape.node.parent = &worldRoot;
+    worldRoot.children.push_back((Node *)&t1);
+    worldRoot.children.push_back((Node *)&t2);
 
     std::string currentTexture("../textures/african_head_diffuse.png");
     app.pngInfo = loadPNG(currentTexture.c_str());

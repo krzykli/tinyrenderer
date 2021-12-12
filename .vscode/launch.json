@@ -10,8 +10,8 @@
             "request": "launch",
             "program": "${workspaceFolder}/build/tinyrenderer",
             "args": [],
-            "stopAtEntry": true,
-            "cwd": "${workspaceFolder}",
+            "stopAtEntry": false,
+            "cwd": "${workspaceFolder}/build",
             "environment": [],
             "externalConsole": false,
             "MIMode": "lldb"

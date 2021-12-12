@@ -56,6 +56,11 @@ typedef struct World {
     Node* worldRoot;
 } World;
 
+typedef struct Transform {
+    Node node;
+    glm::mat4 matrix;
+} Transform;
+
 typedef struct Shape {
     Node node;
 

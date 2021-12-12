@@ -109,13 +109,11 @@ void renderShape(Shape modelData, glm::mat4 perspective, glm::mat4 view, glm::ve
 
 void renderWorld_r(Node *root, App *app, glm::mat4 perspective, glm::mat4 view, glm::vec4 viewport) {
     std::vector<Node *> children = root->children;
-    printf("%i\n", children.size());
     for (int i = 0; i < children.size(); i++) {
         Node *child = children[i];
-        printf("%s\n", child->name);
         if (!strcmp(child->type, "shape")) {
-            printf("rendering\n", child->name);
-            renderShape(*(Shape*)child, perspective, view, viewport, app);
+            Shape cast = *(Shape*)child;
+            renderShape(cast, perspective, view, viewport, app);
         }
         renderWorld_r(child, app, perspective, view, viewport);
     }
