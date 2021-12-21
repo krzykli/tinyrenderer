@@ -87,7 +87,7 @@ void renderShape(Node *node, glm::mat4 perspective, glm::mat4 view, glm::vec4 vi
 
             if (true) {
                 drawTriangleWithTexture(screenCoords[0], screenCoords[1], screenCoords[2],
-                                        app->image, diffuseTexture, normalMapTexture, face, transformedNormals, app->lightDir);
+                                        app->image, diffuseTexture, normalMapTexture, face, transformedNormals, app->lightDir, glm::mat3(modelView));
             } else {
                 float intensity =
                     glm::dot(glm::vec3(transformedNormals[0]), glm::normalize(app->lightDir));

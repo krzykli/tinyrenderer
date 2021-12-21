@@ -122,7 +122,7 @@ glm::vec3 toBarycentric(glm::vec3 bc, glm::vec3* v) {
 
 void drawTriangleWithTexture(glm::vec3 t0, glm::vec3 t1, glm::vec3 t2, Image &image,
                              Png diffuseTexture, Png normalMapTexture, Face face,
-                             glm::vec3 *normals, glm::vec3 lightDir) {
+                             glm::vec3 *normals, glm::vec3 lightDir, glm::mat3 modelView3x3) {
     int minX = imin(imin(imin(t0.x, t1.x), t2.x), image.width - 1);
     int maxX = imax(imax(imax(t0.x, t1.x), t2.x), 0);
 
@@ -149,10 +149,14 @@ void drawTriangleWithTexture(glm::vec3 t0, glm::vec3 t1, glm::vec3 t2, Image &im
             glm::vec3 uv = toBarycentric(bc, face.uvs);
             glm::vec3 bc_normal = toBarycentric(bc, normals);
 
+
             glm::mat3 tangentSpace;
-            tangentSpace[0] = glm::normalize(face.tangent);
-            tangentSpace[1] = glm::normalize(face.bitangent);
-            tangentSpace[2] = glm::normalize(bc_normal);
+            if (glm::dot(glm::cross(face.tangent, bc_normal), face.bitangent) < 0.0f){
+                face.tangent = face.tangent * -1.0f;
+            }
+            tangentSpace[0] = modelView3x3 * glm::normalize(face.tangent);
+            tangentSpace[1] = modelView3x3 * glm::normalize(face.bitangent);
+            tangentSpace[2] = modelView3x3 * glm::normalize(bc_normal);
 
             //
             u32 x = width * uv.x;
@@ -167,10 +171,11 @@ void drawTriangleWithTexture(glm::vec3 t0, glm::vec3 t1, glm::vec3 t2, Image &im
             glm::vec3 textureNormal = glm::vec3((2 * r) - 1, (2 * g) - 1, (2 * b) - 1);
 
             glm::vec3 normal = glm::normalize(tangentSpace * textureNormal);
+            /* normal = bc_normal; */
 
             //
 
-            float intensity = glm::pow(glm::dot(glm::vec3(normal), glm::normalize(lightDir)), 5);
+            float intensity = glm::pow(glm::dot(normal, glm::normalize(lightDir)), 1);
             if (intensity < 0)
                 intensity = 0;
 
