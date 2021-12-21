@@ -21,7 +21,8 @@ typedef struct App {
     glm::vec3 lightDir;
     RenderMode renderMode;
 
-    Png pngInfo;
+    Png diffuseTexture;
+    Png normalMapTexture;
 
     float translateX;
     float translateY;

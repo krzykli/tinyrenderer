@@ -37,6 +37,8 @@ typedef struct {
     glm::vec3 verts[3];
     glm::vec3 normals[3];
     glm::vec3 uvs[3];
+    glm::vec3 tangent;
+    glm::vec3 bitangent;
 } Face;
 
 typedef struct Png {

@@ -360,7 +360,7 @@ void initAppDefaults() {
                 // vector pointing to the right so we initially rotate a bit to the left.
     cam.pitch = 0.0f;
     app.camera = cam;
-    app.pngInfo = {};
+    app.diffuseTexture = {};
 
     app.normalLength = 0.1f;
     app.lightDir = glm::vec3(1, 1, 1);
@@ -429,6 +429,27 @@ void buildTree_r(Node *root) {
     }
 }
 
+void calcTangentSpace(Face &face) {
+    // tangents
+    glm::vec3 v0 = face.verts[0];
+    glm::vec3 v1 = face.verts[1];
+    glm::vec3 v2 = face.verts[2];
+
+    glm::vec3 uv0 = face.uvs[0];
+    glm::vec3 uv1 = face.uvs[1];
+    glm::vec3 uv2 = face.uvs[2];
+
+    glm::vec3 deltaPos1 = v1 - v0;
+    glm::vec3 deltaPos2 = v2 - v0;
+
+    glm::vec3 deltaUV1 = uv1 - uv0;
+    glm::vec3 deltaUV2 = uv2 - uv0;
+
+    float den = 1.0f / (deltaUV1.x * deltaUV2.y - deltaUV1.y * deltaUV2.x);
+    face.tangent = glm::normalize((deltaPos1 * deltaUV2.y - deltaPos2 * deltaUV1.y) * den);
+    face.bitangent = glm::normalize((deltaPos2 * deltaUV1.x - deltaPos1 * deltaUV2.x) * den);
+}
+
 int main(int argc, char **argv) {
     initAppDefaults();
     GLFWwindow *window = initGLWindow(app.resolutionX, app.resolutionY, app.appTitle);
@@ -487,6 +508,9 @@ int main(int argc, char **argv) {
     shape.node.type = "shape";
     shape.node.children = std::vector<Node *>();
     loadOBJ(currentObj.c_str(), shape.faces, shape.vertices, shape.uvs, shape.normals);
+    for (int i=0; i < shape.faces.size(); i++) {
+        calcTangentSpace(shape.faces[i]);
+    }
     t1.node.children.push_back((Node *)&shape);
 
     Transform t2;
@@ -517,16 +541,20 @@ int main(int argc, char **argv) {
     armadilloShape.node.name = "armadillo";
     armadilloShape.node.type = "shape";
     armadilloShape.node.children = std::vector<Node *>();
-    loadOBJ("../obj/armadillo.obj", armadilloShape.faces, armadilloShape.vertices, armadilloShape.uvs, armadilloShape.normals);
+    loadOBJ("../obj/armadillo.obj", armadilloShape.faces, armadilloShape.vertices,
+            armadilloShape.uvs, armadilloShape.normals);
     t3.node.children.push_back((Node *)&armadilloShape);
 
     shape.node.parent = &worldRoot;
     worldRoot.children.push_back((Node *)&t1);
-    worldRoot.children.push_back((Node *)&t2);
-    worldRoot.children.push_back((Node *)&t3);
+    /* worldRoot.children.push_back((Node *)&t2); */
+    /* worldRoot.children.push_back((Node *)&t3); */
 
-    std::string currentTexture("../textures/african_head_diffuse.png");
-    app.pngInfo = loadPNG(currentTexture.c_str());
+    std::string diffuseTexture("../textures/african_head_diffuse.png");
+    app.diffuseTexture = loadPNG(diffuseTexture.c_str());
+
+    std::string normalMapTexture("../textures/african_head_nm.png");
+    app.normalMapTexture = loadPNG(normalMapTexture.c_str());
 
     cr_plugin ctx;
     ctx.userdata = &app;
@@ -625,9 +653,9 @@ int main(int argc, char **argv) {
             /*             loadOBJ(currentObj.c_str(), modelData.faces, modelData.vertices, */
             /*                     modelData.uvs, app.modelData.normals); */
             /*         } else if (strstr(path.c_str(), ".png")) { */
-            /*             currentTexture = path; */
-            /*             free(app.pngInfo.image); */
-            /*             app.pngInfo = loadPNG(path.c_str()); */
+            /*             diffuseTexture = path; */
+            /*             free(app.diffuseTexture.image); */
+            /*             app.diffuseTexture = loadPNG(path.c_str()); */
             /*         } */
             /*     } */
             /*     ImGuiFileDialog::Instance()->Close(); */
@@ -685,7 +713,7 @@ int main(int argc, char **argv) {
                 ImGui::Text("%s", fpsDisplay);
                 ImGui::Separator();
                 ImGui::TextWrapped("Model: %s", currentObj.c_str());
-                ImGui::TextWrapped("Texture: %s", currentTexture.c_str());
+                ImGui::TextWrapped("Texture: %s", diffuseTexture.c_str());
                 /* ImGui::TextWrapped("Triangles : %lu", app.modelData.faces.size()); */
                 ImGui::Separator();
             }
@@ -722,7 +750,7 @@ int main(int argc, char **argv) {
     cr_plugin_close(ctx);
 
     // Cleanup
-    free(app.pngInfo.image);
+    free(app.diffuseTexture.image);
     free(app.image.buffer);
     free(app.image.zbuffer);
     destroyImGui();

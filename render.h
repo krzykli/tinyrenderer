@@ -39,9 +39,10 @@ void renderShape(Node *node, glm::mat4 perspective, glm::mat4 view, glm::vec4 vi
     }
 
     Shape modelData = *(Shape *)node;
-    Png png = app->pngInfo;
+    Png diffuseTexture = app->diffuseTexture;
+    Png normalMapTexture = app->normalMapTexture;
     for (int i = 0; i < modelData.faces.size(); i++) {
-        Face f = modelData.faces[i];
+        Face face = modelData.faces[i];
         glm::vec3 screenCoords[3];
 
         glm::mat4 rotation = glm::rotate(glm::radians(app->rotateY), glm::vec3(0, 1, 0));
@@ -54,12 +55,12 @@ void renderShape(Node *node, glm::mat4 perspective, glm::mat4 view, glm::vec4 vi
         glm::vec3 transformedNormals[3];
 
         for (int j = 0; j < 3; j++) {
-            glm::vec3 v0 = f.verts[j];
+            glm::vec3 v0 = face.verts[j];
             glm::vec4 vertex = glm::vec4(v0.x, v0.y, v0.z, 1);
             glm::vec4 transformedVertex = perspective * modelView * vertex;
             transformedVertices[j] = transformedVertex;
 
-            glm::vec3 n0 = f.normals[j];
+            glm::vec3 n0 = face.normals[j];
             glm::vec4 normal = glm::vec4(n0.x, n0.y, n0.z, 1);
             glm::mat4 normalModelMatrix = glm::transpose(glm::inverse(modelView));
             glm::vec3 transformedNormal = glm::normalize(glm::vec3(normalModelMatrix * normal));
@@ -68,10 +69,13 @@ void renderShape(Node *node, glm::mat4 perspective, glm::mat4 view, glm::vec4 vi
             screenCoords[j] = glm::project(glm::vec3(vertex), modelView, perspective, viewport);
         }
 
-        glm::vec3 normalA = f.normals[0];
+        face.tangent = glm::mat3(modelView) * face.tangent;
+        face.bitangent = glm::mat3(modelView) * face.bitangent;
 
-        app->lightDir.y = cos(2 * glfwGetTime());
-        app->lightDir.x = sin(2 * glfwGetTime());
+        glm::vec3 normalA = face.normals[0];
+
+        /* app->lightDir.y = cos(2 * glfwGetTime()); */
+        /* app->lightDir.x = sin(2 * glfwGetTime()); */
 
         u32 normalColor = int((normalA.x + 1) / 2 * 255) | int((normalA.y + 1) / 2 * 255) << 8 |
                           int((normalA.z + 1) / 2 * 255) << 16 | (0 << 24);
@@ -83,7 +87,7 @@ void renderShape(Node *node, glm::mat4 perspective, glm::mat4 view, glm::vec4 vi
 
             if (true) {
                 drawTriangleWithTexture(screenCoords[0], screenCoords[1], screenCoords[2],
-                                        app->image, png, f.uvs, transformedNormals, app->lightDir);
+                                        app->image, diffuseTexture, normalMapTexture, face, transformedNormals, app->lightDir);
             } else {
                 float intensity =
                     glm::dot(glm::vec3(transformedNormals[0]), glm::normalize(app->lightDir));
@@ -105,7 +109,7 @@ void renderShape(Node *node, glm::mat4 perspective, glm::mat4 view, glm::vec4 vi
             break;
 
         case NORMALS:
-            glm::vec3 normalEnd = f.verts[0] + normalA * app->normalLength;
+            glm::vec3 normalEnd = face.verts[0] + normalA * app->normalLength;
             glm::vec3 screenCoordsEnd =
                 glm::project(glm::vec3(normalEnd), modelView, perspective, viewport);
             drawLine(screenCoords[0], screenCoordsEnd, app->image, normalColor);
