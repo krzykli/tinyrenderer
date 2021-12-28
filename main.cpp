@@ -553,7 +553,7 @@ int main(int argc, char **argv) {
     std::string diffuseTexture("../textures/african_head_diffuse.png");
     app.diffuseTexture = loadPNG(diffuseTexture.c_str());
 
-    std::string normalMapTexture("../textures/african_head_nm.png");
+    std::string normalMapTexture("../textures/african_head_nm_tangent.png");
     app.normalMapTexture = loadPNG(normalMapTexture.c_str());
 
     cr_plugin ctx;

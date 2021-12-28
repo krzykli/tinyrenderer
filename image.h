@@ -116,13 +116,14 @@ float linearToSrgb(float theLinearValue) {
                                         : powf(theLinearValue, 1.0f / 2.4f) * 1.055f - 0.055f;
 }
 
-glm::vec3 toBarycentric(glm::vec3 bc, glm::vec3* v) {
+glm::vec3 toBarycentric(glm::vec3 bc, glm::vec3 *v) {
     return bc[0] * v[0] + bc[1] * v[1] + bc[2] * v[2];
 }
 
 void drawTriangleWithTexture(glm::vec3 t0, glm::vec3 t1, glm::vec3 t2, Image &image,
                              Png diffuseTexture, Png normalMapTexture, Face face,
-                             glm::vec3 *normals, glm::vec3 lightDir, glm::mat3 modelView3x3) {
+                             glm::vec3 *normals, glm::vec3 lightDir, glm::mat4 modelView,
+                             glm::mat4 perspective, glm::vec4 viewport) {
     int minX = imin(imin(imin(t0.x, t1.x), t2.x), image.width - 1);
     int maxX = imax(imax(imax(t0.x, t1.x), t2.x), 0);
 
@@ -149,14 +150,47 @@ void drawTriangleWithTexture(glm::vec3 t0, glm::vec3 t1, glm::vec3 t2, Image &im
             glm::vec3 uv = toBarycentric(bc, face.uvs);
             glm::vec3 bc_normal = toBarycentric(bc, normals);
 
+            glm::mat3 modelView3x3 = glm::mat3(modelView);
 
             glm::mat3 tangentSpace;
-            if (glm::dot(glm::cross(face.tangent, bc_normal), face.bitangent) < 0.0f){
-                face.tangent = face.tangent * -1.0f;
-            }
-            tangentSpace[0] = modelView3x3 * glm::normalize(face.tangent);
-            tangentSpace[1] = modelView3x3 * glm::normalize(face.bitangent);
-            tangentSpace[2] = modelView3x3 * glm::normalize(bc_normal);
+            tangentSpace[0] = modelView3x3 * face.tangent;
+            tangentSpace[1] = modelView3x3 * face.bitangent;
+            tangentSpace[2] = glm::normalize(bc_normal);
+            /* tangentSpace[0] = */
+            /*     glm::normalize(face.tangent - bc_normal * glm::dot(bc_normal, face.tangent)); */
+
+            /* glm::mat3 A; */
+            /* glm::vec3 dx = t1 - t0; */
+            /* glm::vec3 dy = t2 - t0; */
+
+            /* A[0][0] = dx[0]; */
+            /* A[1][0] = dx[1]; */
+            /* A[2][0] = dx[2]; */
+
+            /* A[0][1] = dy[0]; */
+            /* A[1][1] = dy[1]; */
+            /* A[2][1] = dy[2]; */
+
+            /* A[0][2] = bc_normal[0]; */
+            /* A[1][2] = bc_normal[1]; */
+            /* A[2][2] = bc_normal[2]; */
+
+            /* glm::mat3 AI = glm::inverse(A); */
+
+            /* glm::vec3 i = AI * glm::vec3(face.uvs[0][1] - face.uvs[0][0], face.uvs[0][2] -
+             * face.uvs[0][0], 0); */
+            /* glm::vec3 j = AI * glm::vec3(face.uvs[1][1] - face.uvs[1][0], face.uvs[1][2] -
+             * face.uvs[1][0], 0); */
+
+            /* i = AI * glm::vec3(face.uvs[0][1] - face.uvs[0][0], face.uvs[0][2] - face.uvs[0][0],
+             * 0); */
+            /* j = AI * glm::vec3(face.uvs[1][1] - face.uvs[1][0], face.uvs[1][2] - face.uvs[1][0],
+             * 0); */
+
+            /* glm::mat3 B; */
+            /* B[0] = glm::normalize(i); */
+            /* B[1] = glm::normalize(j); */
+            /* B[2] = bc_normal; */
 
             //
             u32 x = width * uv.x;
@@ -164,35 +198,43 @@ void drawTriangleWithTexture(glm::vec3 t0, glm::vec3 t1, glm::vec3 t2, Image &im
 
             u32 offset = (y * width + x) * 4;
 
-            unsigned char r = normalMapTexture.image[offset];
-            unsigned char g = normalMapTexture.image[offset + 1];
-            unsigned char b = normalMapTexture.image[offset + 2];
+            unsigned char nr = normalMapTexture.image[offset];
+            unsigned char ng = normalMapTexture.image[offset + 1];
+            unsigned char nb = normalMapTexture.image[offset + 2];
 
-            glm::vec3 textureNormal = glm::vec3((2 * r) - 1, (2 * g) - 1, (2 * b) - 1);
+            glm::vec3 textureNormal =
+                glm::vec3((2.0f * nr) - 1.0f, (2.0f * ng) - 1.0f, (2.0f * nb) - 1.0f);
 
             glm::vec3 normal = glm::normalize(tangentSpace * textureNormal);
+            /* normal = glm::normalize(B * textureNormal); */
             /* normal = bc_normal; */
 
-            //
-
-            float intensity = glm::pow(glm::dot(normal, glm::normalize(lightDir)), 1);
-            if (intensity < 0)
+            float intensity = glm::dot(normal, glm::normalize(lightDir));
+            if (intensity < 0) {
                 intensity = 0;
+            } else {
+                intensity = pow(intensity, 2);
+            }
 
-            r = diffuseTexture.image[offset] * intensity;
-            g = diffuseTexture.image[offset + 1] * intensity;
-            b = diffuseTexture.image[offset + 2] * intensity;
+            u8 r = diffuseTexture.image[offset] * intensity;
+            u8 g = diffuseTexture.image[offset + 1] * intensity;
+            u8 b = diffuseTexture.image[offset + 2] * intensity;
             u8 rsrgb = u8(linearToSrgb(r / 255.0f) * 255);
             u8 gsrgb = u8(linearToSrgb(g / 255.0f) * 255);
             u8 bsrgb = u8(linearToSrgb(b / 255.0f) * 255);
-
             u32 color = rsrgb | gsrgb << 8 | bsrgb << 16 | (255 << 24);
-            int coord = int(P.x + P.y * image.width);
 
+            u32 colorNormal = int(((normal.x + 1.0f) / 2.0f) * 255.0f) |
+                              int(((normal.y + 1.0f) / 2.0f) * 255.0f) << 8 |
+                              int(((normal.z + 1.0f) / 2.0f) * 255) << 16 |
+                              (255 << 24);
+
+            u32 colorNormalTexture = nr | ng << 8 | nb << 16 | (255 << 24);
+
+            int coord = int(P.x + P.y * image.width);
             if (image.zbuffer[coord] < P.z) {
                 image.zbuffer[coord] = P.z;
-
-                drawPixel(P.x, P.y, color, image);
+                drawPixel(P.x, P.y, colorNormal, image);
             }
         }
     }

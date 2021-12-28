@@ -9,9 +9,9 @@
 #include "image.h"
 #include "types.h"
 #include <GLFW/glfw3.h>
-#include <glm/gtx/transform.hpp>
 #include <glm/gtx/matrix_decompose.hpp>
 #include <glm/gtx/string_cast.hpp>
+#include <glm/gtx/transform.hpp>
 
 void drawAxis(glm::mat4 view, glm::mat4 perspective, glm::vec4 viewport, Image image) {
     glm::vec3 origin(0, 0, 0);
@@ -69,8 +69,8 @@ void renderShape(Node *node, glm::mat4 perspective, glm::mat4 view, glm::vec4 vi
             screenCoords[j] = glm::project(glm::vec3(vertex), modelView, perspective, viewport);
         }
 
-        face.tangent = glm::mat3(modelView) * face.tangent;
-        face.bitangent = glm::mat3(modelView) * face.bitangent;
+        /* face.tangent = glm::normalize(glm::mat3(modelView) * face.tangent); */
+        /* face.bitangent = glm::normalize(glm::mat3(modelView) * face.bitangent); */
 
         glm::vec3 normalA = face.normals[0];
 
@@ -87,7 +87,9 @@ void renderShape(Node *node, glm::mat4 perspective, glm::mat4 view, glm::vec4 vi
 
             if (true) {
                 drawTriangleWithTexture(screenCoords[0], screenCoords[1], screenCoords[2],
-                                        app->image, diffuseTexture, normalMapTexture, face, transformedNormals, app->lightDir, glm::mat3(modelView));
+                                        app->image, diffuseTexture, normalMapTexture, face,
+                                        transformedNormals, glm::mat3(view) * app->lightDir,
+                                        modelView, perspective, viewport);
             } else {
                 float intensity =
                     glm::dot(glm::vec3(transformedNormals[0]), glm::normalize(app->lightDir));
