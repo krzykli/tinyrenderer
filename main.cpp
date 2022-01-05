@@ -447,19 +447,18 @@ void calcTangentSpace(Face &face) {
 
     float f = 1.0f / (deltaUV1.x * deltaUV2.y - deltaUV2.x * deltaUV1.y);
 
+    face.faceNormal = glm::cross(edge1, edge2);
+
     glm::vec3 tangent, bitangent;
     tangent.x = f * (deltaUV2.y * edge1.x - deltaUV1.y * edge2.x);
-    tangent.t = f * (deltaUV2.y * edge1.y - deltaUV1.y * edge2.y);
+    tangent.y = f * (deltaUV2.y * edge1.y - deltaUV1.y * edge2.y);
     tangent.z = f * (deltaUV2.y * edge1.z - deltaUV1.y * edge2.z);
     face.tangent = glm::normalize(tangent);
 
     bitangent.x = f * (-deltaUV2.x * edge1.x + deltaUV1.x * edge2.x);
-    bitangent.t = f * (-deltaUV2.x * edge1.y + deltaUV1.x * edge2.y);
+    bitangent.y = f * (-deltaUV2.x * edge1.y + deltaUV1.x * edge2.y);
     bitangent.z = f * (-deltaUV2.x * edge1.z + deltaUV1.x * edge2.z);
-
     face.bitangent = glm::normalize(bitangent);
-
-    face.faceNormal = glm::cross(edge1, edge2);
 }
 
 int main(int argc, char **argv) {

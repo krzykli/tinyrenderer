@@ -190,15 +190,18 @@ void drawTriangleWithTexture(glm::vec3 t0, glm::vec3 t1, glm::vec3 t2, Image &im
 
             glm::vec3 T = glm::normalize(modelVector * face.tangent);
             glm::vec3 B = glm::normalize(modelVector * face.bitangent);
-            glm::vec3 N = glm::normalize(modelVector * face.faceNormal);
+            glm::vec3 N = glm::normalize(bc_normal);
 
-            if (glm::dot(glm::cross(N, T), B) < 0.0f) {
+            T = glm::normalize(T - N * glm::dot(N, T));
+            B = glm::normalize(B - N * glm::dot(N, B));
+
+            if (glm::dot(glm::cross(T, N), B) < 0.0f){
                 T = T * -1.0f;
             }
 
             tangentSpace[0] = T;
             tangentSpace[1] = B;
-            tangentSpace[2] = bc_normal;
+            tangentSpace[2] = N;
 
             u32 x = width * uv.x;
             u32 y = height * uv.y;
@@ -210,7 +213,7 @@ void drawTriangleWithTexture(glm::vec3 t0, glm::vec3 t1, glm::vec3 t2, Image &im
             unsigned char nb = normalMapTexture.image[offset + 2];
 
             glm::vec3 textureNormal =
-                glm::vec3((2.0f * nr) - 1.0f, (2.0f * ng) - 1.0f, (2.0f * nb) - 1.0f);
+                glm::vec3(2.0f * nr - 1.0f, 2.0f * ng - 1.0f, 2.0f * nb - 1.0f);
 
             glm::vec3 normal = glm::normalize(tangentSpace * textureNormal);
             /* normal = bc_normal; */
@@ -234,12 +237,15 @@ void drawTriangleWithTexture(glm::vec3 t0, glm::vec3 t1, glm::vec3 t2, Image &im
                               int(((normal.y + 1.0f) / 2.0f) * 255.0f) << 8 |
                               int(((normal.z + 1.0f) / 2.0f) * 255) << 16 | (255 << 24);
 
+            /* colorNormal = 0 | 0 | */
+            /*                   int(((normal.z + 1.0f) / 2.0f) * 255) << 16 | (255 << 24); */
+
             u32 colorNormalTexture = nr | ng << 8 | nb << 16 | (255 << 24);
 
             int coord = int(P.x + P.y * image.width);
             if (image.zbuffer[coord] < P.z) {
                 image.zbuffer[coord] = P.z;
-                drawPixel(P.x, P.y, color, image);
+                drawPixel(P.x, P.y, colorNormal, image);
             }
         }
     }
