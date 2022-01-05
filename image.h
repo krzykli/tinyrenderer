@@ -120,10 +120,42 @@ glm::vec3 toBarycentric(glm::vec3 bc, glm::vec3 *v) {
     return bc[0] * v[0] + bc[1] * v[1] + bc[2] * v[2];
 }
 
+void calcTangentSpace2(Face &face) {
+    // tangents
+    glm::vec3 v0 = face.verts[0];
+    glm::vec3 v1 = face.verts[1];
+    glm::vec3 v2 = face.verts[2];
+
+    glm::vec3 uv0 = face.uvs[0];
+    glm::vec3 uv1 = face.uvs[1];
+    glm::vec3 uv2 = face.uvs[2];
+
+    glm::vec3 edge1 = v1 - v0;
+    glm::vec3 edge2 = v2 - v0;
+
+    glm::vec3 deltaUV1 = uv1 - uv0;
+    glm::vec3 deltaUV2 = uv2 - uv0;
+
+    float f = 1.0f / (deltaUV1.x * deltaUV2.y - deltaUV2.x * deltaUV1.y);
+
+    glm::vec3 tangent, bitangent;
+    tangent.x = f * (deltaUV2.y * edge1.x - deltaUV1.y * edge2.x);
+    tangent.t = f * (deltaUV2.y * edge1.y - deltaUV1.y * edge2.y);
+    tangent.z = f * (deltaUV2.y * edge1.z - deltaUV1.y * edge2.z);
+    face.tangent = glm::normalize(tangent);
+
+    bitangent.x = f * (-deltaUV2.x * edge1.x + deltaUV1.x * edge2.x);
+    bitangent.t = f * (-deltaUV2.x * edge1.y + deltaUV1.x * edge2.y);
+    bitangent.z = f * (-deltaUV2.x * edge1.z + deltaUV1.x * edge2.z);
+    face.bitangent = glm::normalize(bitangent);
+
+    face.faceNormal = glm::cross(edge1, edge2);
+}
+
 void drawTriangleWithTexture(glm::vec3 t0, glm::vec3 t1, glm::vec3 t2, Image &image,
                              Png diffuseTexture, Png normalMapTexture, Face face,
-                             glm::vec3 *normals, glm::vec3 lightDir, glm::mat4 modelView,
-                             glm::mat4 perspective, glm::vec4 viewport) {
+                             glm::vec3 *normals, glm::vec3 lightDir, glm::mat4 model,
+                             glm::mat4 view, glm::mat4 perspective, glm::vec4 viewport) {
     int minX = imin(imin(imin(t0.x, t1.x), t2.x), image.width - 1);
     int maxX = imax(imax(imax(t0.x, t1.x), t2.x), 0);
 
@@ -147,52 +179,27 @@ void drawTriangleWithTexture(glm::vec3 t0, glm::vec3 t1, glm::vec3 t2, Image &im
             P.z += t1.z * bc[1];
             P.z += t2.z * bc[2];
 
+            glm::mat3 modelVector = glm::transpose(glm::inverse(glm::mat3(view * model)));
+
             glm::vec3 uv = toBarycentric(bc, face.uvs);
             glm::vec3 bc_normal = toBarycentric(bc, normals);
 
-            glm::mat3 modelView3x3 = glm::mat3(modelView);
-
             glm::mat3 tangentSpace;
-            tangentSpace[0] = modelView3x3 * face.tangent;
-            tangentSpace[1] = modelView3x3 * face.bitangent;
-            tangentSpace[2] = glm::normalize(bc_normal);
-            /* tangentSpace[0] = */
-            /*     glm::normalize(face.tangent - bc_normal * glm::dot(bc_normal, face.tangent)); */
+            glm::vec3 edge1 = t1 - t0;
+            glm::vec3 edge2 = t2 - t0;
 
-            /* glm::mat3 A; */
-            /* glm::vec3 dx = t1 - t0; */
-            /* glm::vec3 dy = t2 - t0; */
+            glm::vec3 T = glm::normalize(modelVector * face.tangent);
+            glm::vec3 B = glm::normalize(modelVector * face.bitangent);
+            glm::vec3 N = glm::normalize(modelVector * face.faceNormal);
 
-            /* A[0][0] = dx[0]; */
-            /* A[1][0] = dx[1]; */
-            /* A[2][0] = dx[2]; */
+            if (glm::dot(glm::cross(N, T), B) < 0.0f) {
+                T = T * -1.0f;
+            }
 
-            /* A[0][1] = dy[0]; */
-            /* A[1][1] = dy[1]; */
-            /* A[2][1] = dy[2]; */
+            tangentSpace[0] = T;
+            tangentSpace[1] = B;
+            tangentSpace[2] = bc_normal;
 
-            /* A[0][2] = bc_normal[0]; */
-            /* A[1][2] = bc_normal[1]; */
-            /* A[2][2] = bc_normal[2]; */
-
-            /* glm::mat3 AI = glm::inverse(A); */
-
-            /* glm::vec3 i = AI * glm::vec3(face.uvs[0][1] - face.uvs[0][0], face.uvs[0][2] -
-             * face.uvs[0][0], 0); */
-            /* glm::vec3 j = AI * glm::vec3(face.uvs[1][1] - face.uvs[1][0], face.uvs[1][2] -
-             * face.uvs[1][0], 0); */
-
-            /* i = AI * glm::vec3(face.uvs[0][1] - face.uvs[0][0], face.uvs[0][2] - face.uvs[0][0],
-             * 0); */
-            /* j = AI * glm::vec3(face.uvs[1][1] - face.uvs[1][0], face.uvs[1][2] - face.uvs[1][0],
-             * 0); */
-
-            /* glm::mat3 B; */
-            /* B[0] = glm::normalize(i); */
-            /* B[1] = glm::normalize(j); */
-            /* B[2] = bc_normal; */
-
-            //
             u32 x = width * uv.x;
             u32 y = height * uv.y;
 
@@ -206,7 +213,6 @@ void drawTriangleWithTexture(glm::vec3 t0, glm::vec3 t1, glm::vec3 t2, Image &im
                 glm::vec3((2.0f * nr) - 1.0f, (2.0f * ng) - 1.0f, (2.0f * nb) - 1.0f);
 
             glm::vec3 normal = glm::normalize(tangentSpace * textureNormal);
-            /* normal = glm::normalize(B * textureNormal); */
             /* normal = bc_normal; */
 
             float intensity = glm::dot(normal, glm::normalize(lightDir));
@@ -226,15 +232,14 @@ void drawTriangleWithTexture(glm::vec3 t0, glm::vec3 t1, glm::vec3 t2, Image &im
 
             u32 colorNormal = int(((normal.x + 1.0f) / 2.0f) * 255.0f) |
                               int(((normal.y + 1.0f) / 2.0f) * 255.0f) << 8 |
-                              int(((normal.z + 1.0f) / 2.0f) * 255) << 16 |
-                              (255 << 24);
+                              int(((normal.z + 1.0f) / 2.0f) * 255) << 16 | (255 << 24);
 
             u32 colorNormalTexture = nr | ng << 8 | nb << 16 | (255 << 24);
 
             int coord = int(P.x + P.y * image.width);
             if (image.zbuffer[coord] < P.z) {
                 image.zbuffer[coord] = P.z;
-                drawPixel(P.x, P.y, colorNormal, image);
+                drawPixel(P.x, P.y, color, image);
             }
         }
     }

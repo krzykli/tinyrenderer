@@ -49,7 +49,8 @@ void renderShape(Node *node, glm::mat4 perspective, glm::mat4 view, glm::vec4 vi
         glm::mat4 scale = glm::scale(glm::vec3(app->scale, app->scale, app->scale));
         glm::mat4 translation = glm::translate(glm::vec3(app->translateX, app->translateY, 0));
 
-        glm::mat4 modelView = view * parentWorldMatrix * rotation;
+        glm::mat4 model = rotation;
+        glm::mat4 modelView = view * parentWorldMatrix * model;
 
         glm::vec3 transformedVertices[3];
         glm::vec3 transformedNormals[3];
@@ -89,7 +90,7 @@ void renderShape(Node *node, glm::mat4 perspective, glm::mat4 view, glm::vec4 vi
                 drawTriangleWithTexture(screenCoords[0], screenCoords[1], screenCoords[2],
                                         app->image, diffuseTexture, normalMapTexture, face,
                                         transformedNormals, glm::mat3(view) * app->lightDir,
-                                        modelView, perspective, viewport);
+                                        model, view, perspective, viewport);
             } else {
                 float intensity =
                     glm::dot(glm::vec3(transformedNormals[0]), glm::normalize(app->lightDir));
