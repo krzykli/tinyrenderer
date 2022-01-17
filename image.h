@@ -212,8 +212,12 @@ void drawTriangleWithTexture(glm::vec3 t0, glm::vec3 t1, glm::vec3 t2, Image &im
             unsigned char ng = normalMapTexture.image[offset + 1];
             unsigned char nb = normalMapTexture.image[offset + 2];
 
+            float fr = nr / 255.0f;
+            float fg = ng / 255.0f;
+            float fb = nb / 255.0f;
+
             glm::vec3 textureNormal =
-                glm::vec3(2.0f * nr - 1.0f, 2.0f * ng - 1.0f, 2.0f * nb - 1.0f);
+                glm::vec3(2.0f * fr - 1.0f, 2.0f * fg - 1.0f, 2.0f * fb - 1.0f);
 
             glm::vec3 normal = glm::normalize(tangentSpace * textureNormal);
             /* normal = bc_normal; */
@@ -245,7 +249,7 @@ void drawTriangleWithTexture(glm::vec3 t0, glm::vec3 t1, glm::vec3 t2, Image &im
             int coord = int(P.x + P.y * image.width);
             if (image.zbuffer[coord] < P.z) {
                 image.zbuffer[coord] = P.z;
-                drawPixel(P.x, P.y, colorNormal, image);
+                drawPixel(P.x, P.y, color, image);
             }
         }
     }
