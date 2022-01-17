@@ -43,7 +43,7 @@ typedef struct {
 } Face;
 
 typedef struct Png {
-    unsigned char *image;
+    unsigned char *buffer;
     unsigned width;
     unsigned height;
 } Png;

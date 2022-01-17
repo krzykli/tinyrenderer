@@ -137,14 +137,14 @@ void clearImage(Image &image) {
 
 Png loadPNG(const char *filename) {
     unsigned error;
-    unsigned char *image = 0;
+    unsigned char *buffer = 0;
     unsigned width, height;
 
-    error = lodepng_decode32_file(&image, &width, &height, filename);
+    error = lodepng_decode32_file(&buffer, &width, &height, filename);
     if (error)
         printf("error %u: %s\n", error, lodepng_error_text(error));
 
-    return {.image = image, .width = width, .height = height};
+    return {.buffer = buffer, .width = width, .height = height};
 }
 
 void flipImageVertically(Image &image) {
@@ -458,7 +458,12 @@ void calcTangentSpace(Face &face) {
     bitangent.x = f * (-deltaUV2.x * edge1.x + deltaUV1.x * edge2.x);
     bitangent.y = f * (-deltaUV2.x * edge1.y + deltaUV1.x * edge2.y);
     bitangent.z = f * (-deltaUV2.x * edge1.z + deltaUV1.x * edge2.z);
+
     face.bitangent = glm::normalize(bitangent);
+
+    /* float r = 1.0f / (deltaUV1.x * deltaUV2.y - deltaUV1.y * deltaUV2.x); */
+    /* face.tangent = glm::normalize((edge1 * deltaUV2.y   - edge2 * deltaUV1.y)*r); */
+    /* face.bitangent = glm::normalize((edge2 * deltaUV1.x   - edge1 * deltaUV2.x)*r); */
 }
 
 int main(int argc, char **argv) {
@@ -537,6 +542,9 @@ int main(int argc, char **argv) {
     shapeF16.node.type = "shape";
     shapeF16.node.children = std::vector<Node *>();
     loadOBJ("../obj/f16.obj", shapeF16.faces, shapeF16.vertices, shapeF16.uvs, shapeF16.normals);
+    for (int i=0; i < shapeF16.faces.size(); i++) {
+        calcTangentSpace(shapeF16.faces[i]);
+    }
     t2.node.children.push_back((Node *)&shapeF16);
 
     Transform t3;
@@ -554,12 +562,15 @@ int main(int argc, char **argv) {
     armadilloShape.node.children = std::vector<Node *>();
     loadOBJ("../obj/armadillo.obj", armadilloShape.faces, armadilloShape.vertices,
             armadilloShape.uvs, armadilloShape.normals);
+    for (int i=0; i < armadilloShape.faces.size(); i++) {
+        calcTangentSpace(armadilloShape.faces[i]);
+    }
     t3.node.children.push_back((Node *)&armadilloShape);
 
     shape.node.parent = &worldRoot;
     worldRoot.children.push_back((Node *)&t1);
-    /* worldRoot.children.push_back((Node *)&t2); */
-    /* worldRoot.children.push_back((Node *)&t3); */
+    worldRoot.children.push_back((Node *)&t2);
+    worldRoot.children.push_back((Node *)&t3);
 
     std::string diffuseTexture("../textures/african_head_diffuse.png");
     app.diffuseTexture = loadPNG(diffuseTexture.c_str());
@@ -761,7 +772,7 @@ int main(int argc, char **argv) {
     cr_plugin_close(ctx);
 
     // Cleanup
-    free(app.diffuseTexture.image);
+    free(app.diffuseTexture.buffer);
     free(app.image.buffer);
     free(app.image.zbuffer);
     destroyImGui();

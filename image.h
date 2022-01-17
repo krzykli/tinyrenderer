@@ -101,17 +101,7 @@ glm::vec3 barycentric(glm::vec3 A, glm::vec3 B, glm::vec3 C, glm::vec3 P) {
 /*     } */
 /* } */
 
-unsigned char *samplePngTexture(Png png, float u, float v) {
-    u32 width = png.width;
-    u32 height = png.height;
-    u32 x = width * u;
-    u32 y = height * v;
-
-    u32 offset = (y * width + x) * 4;
-    return &png.image[offset];
-}
-
-float linearToSrgb(float theLinearValue) {
+inline float linearToSrgb(float theLinearValue) {
     return theLinearValue <= 0.0031308f ? theLinearValue * 12.92f
                                         : powf(theLinearValue, 1.0f / 2.4f) * 1.055f - 0.055f;
 }
@@ -152,6 +142,33 @@ void calcTangentSpace2(Face &face) {
     face.faceNormal = glm::cross(edge1, edge2);
 }
 
+glm::vec3 sampleNormalTexture(int offset, Png texture) {
+    unsigned char r = texture.buffer[offset];
+    unsigned char g = texture.buffer[offset + 1];
+    unsigned char b = texture.buffer[offset + 2];
+
+    float fr = r / 255.0f;
+    float fg = g / 255.0f;
+    float fb = b / 255.0f;
+
+    glm::vec3 textureNormal =
+        glm::vec3(2.0f * fr - 1.0f, 2.0f * fg - 1.0f, 2.0f * fb - 1.0f);
+
+    return textureNormal;
+}
+
+glm::vec3 sampleDiffuseTexture(int offset, Png texture) {
+    unsigned char r = texture.buffer[offset];
+    unsigned char g = texture.buffer[offset + 1];
+    unsigned char b = texture.buffer[offset + 2];
+
+    return glm::vec3(r, g, b);
+}
+
+inline u32 rgbToU32(u8 r, u8 g, u8 b) {
+    return r | g << 8 | b << 16 | (255 << 24);
+}
+
 void drawTriangleWithTexture(glm::vec3 t0, glm::vec3 t1, glm::vec3 t2, Image &image,
                              Png diffuseTexture, Png normalMapTexture, Face face,
                              glm::vec3 *normals, glm::vec3 lightDir, glm::mat4 model,
@@ -182,7 +199,7 @@ void drawTriangleWithTexture(glm::vec3 t0, glm::vec3 t1, glm::vec3 t2, Image &im
             glm::mat3 modelVector = glm::transpose(glm::inverse(glm::mat3(view * model)));
 
             glm::vec3 uv = toBarycentric(bc, face.uvs);
-            glm::vec3 bc_normal = toBarycentric(bc, normals);
+            glm::vec3 barycentricNormal = toBarycentric(bc, normals);
 
             glm::mat3 tangentSpace;
             glm::vec3 edge1 = t1 - t0;
@@ -190,14 +207,7 @@ void drawTriangleWithTexture(glm::vec3 t0, glm::vec3 t1, glm::vec3 t2, Image &im
 
             glm::vec3 T = glm::normalize(modelVector * face.tangent);
             glm::vec3 B = glm::normalize(modelVector * face.bitangent);
-            glm::vec3 N = glm::normalize(bc_normal);
-
-            T = glm::normalize(T - N * glm::dot(N, T));
-            B = glm::normalize(B - N * glm::dot(N, B));
-
-            if (glm::dot(glm::cross(T, N), B) < 0.0f){
-                T = T * -1.0f;
-            }
+            glm::vec3 N = glm::normalize(barycentricNormal);
 
             tangentSpace[0] = T;
             tangentSpace[1] = B;
@@ -208,19 +218,8 @@ void drawTriangleWithTexture(glm::vec3 t0, glm::vec3 t1, glm::vec3 t2, Image &im
 
             u32 offset = (y * width + x) * 4;
 
-            unsigned char nr = normalMapTexture.image[offset];
-            unsigned char ng = normalMapTexture.image[offset + 1];
-            unsigned char nb = normalMapTexture.image[offset + 2];
-
-            float fr = nr / 255.0f;
-            float fg = ng / 255.0f;
-            float fb = nb / 255.0f;
-
-            glm::vec3 textureNormal =
-                glm::vec3(2.0f * fr - 1.0f, 2.0f * fg - 1.0f, 2.0f * fb - 1.0f);
-
+            glm::vec3 textureNormal = sampleNormalTexture(offset, normalMapTexture);
             glm::vec3 normal = glm::normalize(tangentSpace * textureNormal);
-            /* normal = bc_normal; */
 
             float intensity = glm::dot(normal, glm::normalize(lightDir));
             if (intensity < 0) {
@@ -229,22 +228,12 @@ void drawTriangleWithTexture(glm::vec3 t0, glm::vec3 t1, glm::vec3 t2, Image &im
                 intensity = pow(intensity, 2);
             }
 
-            u8 r = diffuseTexture.image[offset] * intensity;
-            u8 g = diffuseTexture.image[offset + 1] * intensity;
-            u8 b = diffuseTexture.image[offset + 2] * intensity;
-            u8 rsrgb = u8(linearToSrgb(r / 255.0f) * 255);
-            u8 gsrgb = u8(linearToSrgb(g / 255.0f) * 255);
-            u8 bsrgb = u8(linearToSrgb(b / 255.0f) * 255);
-            u32 color = rsrgb | gsrgb << 8 | bsrgb << 16 | (255 << 24);
+            glm::vec3 diffuseColor = sampleDiffuseTexture(offset, diffuseTexture) * intensity;
+            u8 rsrgb = u8(linearToSrgb(diffuseColor.r / 255.0f) * 255);
+            u8 gsrgb = u8(linearToSrgb(diffuseColor.g / 255.0f) * 255);
+            u8 bsrgb = u8(linearToSrgb(diffuseColor.b / 255.0f) * 255);
 
-            u32 colorNormal = int(((normal.x + 1.0f) / 2.0f) * 255.0f) |
-                              int(((normal.y + 1.0f) / 2.0f) * 255.0f) << 8 |
-                              int(((normal.z + 1.0f) / 2.0f) * 255) << 16 | (255 << 24);
-
-            /* colorNormal = 0 | 0 | */
-            /*                   int(((normal.z + 1.0f) / 2.0f) * 255) << 16 | (255 << 24); */
-
-            u32 colorNormalTexture = nr | ng << 8 | nb << 16 | (255 << 24);
+            u32 color = rgbToU32(rsrgb, gsrgb, bsrgb);
 
             int coord = int(P.x + P.y * image.width);
             if (image.zbuffer[coord] < P.z) {
