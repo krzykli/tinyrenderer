@@ -132,6 +132,7 @@ void clearImage(Image &image) {
     for (int i = 0; i < image.width * image.height; i++) {
         image.buffer[i] = 0;
         image.zbuffer[i] = 0;
+        image.shadowbuffer[i] = 0;
     }
 }
 
@@ -147,7 +148,7 @@ Png loadPNG(const char *filename) {
     return {.buffer = buffer, .width = width, .height = height};
 }
 
-void flipImageVertically(Image &image) {
+void flipBuffersVertically(Image &image) {
     int width = image.width;
     int height = image.height;
     unsigned rows = height / 2;
@@ -173,6 +174,18 @@ void flipImageVertically(Image &image) {
     }
 
     free(tempRowZdepth);
+
+    float *tempRowShadowbuffer = (float *)malloc(width * sizeof(float));
+
+    for (int rowIndex = 0; rowIndex < rows; rowIndex++) {
+        memcpy(tempRowShadowbuffer, image.shadowbuffer + rowIndex * width, width * sizeof(float));
+        memcpy(image.shadowbuffer + rowIndex * width, image.shadowbuffer + (height - rowIndex - 1) * width,
+               width * sizeof(float));
+        memcpy(image.shadowbuffer + (height - rowIndex - 1) * width, tempRowShadowbuffer,
+               width * sizeof(float));
+    }
+
+    free(tempRowShadowbuffer);
 }
 
 void mouseButtonCallback(GLFWwindow *window, int button, int action, int mods) {
@@ -304,6 +317,10 @@ void keyCallback(GLFWwindow *window, int key, int scancode, int action, int mods
             app.renderMode = ZBUFFER;
             break;
 
+        case GLFW_KEY_5:
+            app.renderMode = SHADOWBUFFER;
+            break;
+
         case GLFW_KEY_SPACE:
             app.displayUI = !app.displayUI;
             break;
@@ -363,7 +380,7 @@ void initAppDefaults() {
     app.diffuseTexture = {};
 
     app.normalLength = 0.1f;
-    app.lightDir = glm::vec3(1, 1, 1);
+    app.lightDir = glm::vec3(5, 5, 5);
 
     app.showAxis = false;
     app.turntable = false;
@@ -408,6 +425,8 @@ const char *getCurrentItemFromCurrentRenderMode() {
         return "Normals";
     case ZBUFFER:
         return "Zbuffer";
+    case SHADOWBUFFER:
+        return "Shadowbuffer";
     }
 }
 
@@ -484,6 +503,7 @@ int main(int argc, char **argv) {
 
     app.image.buffer = (u32 *)malloc(BUFFER_WIDTH * BUFFER_HEIGHT * sizeof(u32));
     app.image.zbuffer = (float *)malloc(BUFFER_WIDTH * BUFFER_HEIGHT * sizeof(float));
+    app.image.shadowbuffer = (float *)malloc(BUFFER_WIDTH * BUFFER_HEIGHT * sizeof(float));
     app.image.width = BUFFER_WIDTH;
     app.image.height = BUFFER_HEIGHT;
 
@@ -613,7 +633,7 @@ int main(int argc, char **argv) {
         }
 
         cr_plugin_update(ctx); // render
-        flipImageVertically(app.image);
+        flipBuffersVertically(app.image);
 
         glClear(GL_COLOR_BUFFER_BIT);
 
@@ -629,6 +649,16 @@ int main(int argc, char **argv) {
             }
             glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, app.image.width, app.image.height, GL_RGBA,
                             GL_UNSIGNED_BYTE, app.image.zbuffer);
+        }
+        else if (app.renderMode == SHADOWBUFFER) {
+            for (int i = 0; i < app.image.width * app.image.height; i++) {
+                float z = app.image.shadowbuffer[i];
+                if (z > 0) {
+                    app.image.shadowbuffer[i] = powf(z, zdepthExponent);
+                }
+            }
+            glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, app.image.width, app.image.height, GL_RGBA,
+                            GL_UNSIGNED_BYTE, app.image.shadowbuffer);
         } else {
             glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, app.image.width, app.image.height, GL_RGBA,
                             GL_UNSIGNED_BYTE, app.image.buffer);
@@ -689,7 +719,7 @@ int main(int argc, char **argv) {
 
             ImGui::Begin("TinyRenderer");
 
-            const char *items[] = {"Triangles", "Points", "Normals", "Zbuffer"};
+            const char *items[] = {"Triangles", "Points", "Normals", "Zbuffer", "Shadowbuffer"};
             const char *current_item = getCurrentItemFromCurrentRenderMode();
 
             if (ImGui::BeginCombo("Render Mode", current_item)) {
@@ -711,6 +741,8 @@ int main(int argc, char **argv) {
                 app.renderMode = NORMALS;
             } else if (!strcmp(current_item, "Zbuffer")) {
                 app.renderMode = ZBUFFER;
+            } else if (!strcmp(current_item, "Shadowbuffer")) {
+                app.renderMode = SHADOWBUFFER;
             }
 
             if (ImGui::CollapsingHeader("Settings")) {
@@ -775,6 +807,7 @@ int main(int argc, char **argv) {
     free(app.diffuseTexture.buffer);
     free(app.image.buffer);
     free(app.image.zbuffer);
+    free(app.image.shadowbuffer);
     destroyImGui();
 
     glfwDestroyWindow(window);

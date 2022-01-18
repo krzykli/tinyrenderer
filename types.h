@@ -12,7 +12,7 @@ typedef uint32_t u32;
 typedef uint16_t u16;
 typedef uint8_t u8;
 
-enum RenderMode { TRIANGLES = 0, POINTS = 1, NORMALS = 2, ZBUFFER = 3 };
+enum RenderMode { TRIANGLES = 0, POINTS = 1, NORMALS = 2, ZBUFFER = 3, SHADOWBUFFER = 4};
 
 typedef struct Camera {
     glm::vec3 pos;
@@ -29,6 +29,7 @@ typedef struct Camera {
 typedef struct Image {
     u32 *buffer;
     float *zbuffer;
+    float *shadowbuffer;
     u32 width;
     u32 height;
 } Image;

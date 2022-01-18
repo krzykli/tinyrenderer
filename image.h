@@ -151,8 +151,7 @@ glm::vec3 sampleNormalTexture(int offset, Png texture) {
     float fg = g / 255.0f;
     float fb = b / 255.0f;
 
-    glm::vec3 textureNormal =
-        glm::vec3(2.0f * fr - 1.0f, 2.0f * fg - 1.0f, 2.0f * fb - 1.0f);
+    glm::vec3 textureNormal = glm::vec3(2.0f * fr - 1.0f, 2.0f * fg - 1.0f, 2.0f * fb - 1.0f);
 
     return textureNormal;
 }
@@ -165,14 +164,41 @@ glm::vec3 sampleDiffuseTexture(int offset, Png texture) {
     return glm::vec3(r, g, b);
 }
 
-inline u32 rgbToU32(u8 r, u8 g, u8 b) {
-    return r | g << 8 | b << 16 | (255 << 24);
+inline u32 rgbToU32(u8 r, u8 g, u8 b) { return r | g << 8 | b << 16 | (255 << 24); }
+
+void drawShadowbuffer(glm::vec3 t0, glm::vec3 t1, glm::vec3 t2, Image &image) {
+    int minX = imin(imin(imin(t0.x, t1.x), t2.x), image.width - 1);
+    int maxX = imax(imax(imax(t0.x, t1.x), t2.x), 0);
+
+    int minY = imin(imin(imin(t0.y, t1.y), t2.y), image.height - 1);
+    int maxY = imax(imax(imax(t0.y, t1.y), t2.y), 0);
+
+    glm::vec3 P;
+
+    for (P.x = minX; P.x <= maxX; P.x++) {
+        for (P.y = minY; P.y <= maxY; P.y++) {
+
+            glm::vec3 bc = barycentric(t0, t1, t2, P);
+
+            if (bc.x < 0 || bc.y < 0 || bc.z < 0)
+                continue;
+
+            P.z = 0;
+            P.z += t0.z * bc[0];
+            P.z += t1.z * bc[1];
+            P.z += t2.z * bc[2];
+
+            int coord = int(P.x + P.y * image.width);
+            image.shadowbuffer[coord] = P.z;
+        }
+    }
 }
 
 void drawTriangleWithTexture(glm::vec3 t0, glm::vec3 t1, glm::vec3 t2, Image &image,
                              Png diffuseTexture, Png normalMapTexture, Face face,
                              glm::vec3 *normals, glm::vec3 lightDir, glm::mat4 model,
-                             glm::mat4 view, glm::mat4 perspective, glm::vec4 viewport) {
+                             glm::mat4 view, glm::mat4 perspective, glm::vec4 viewport,
+                             glm::mat4 shadowMatrix) {
     int minX = imin(imin(imin(t0.x, t1.x), t2.x), image.width - 1);
     int maxX = imax(imax(imax(t0.x, t1.x), t2.x), 0);
 
@@ -190,6 +216,28 @@ void drawTriangleWithTexture(glm::vec3 t0, glm::vec3 t1, glm::vec3 t2, Image &im
 
             if (bc.x < 0 || bc.y < 0 || bc.z < 0)
                 continue;
+
+            glm::mat3 vertsMat(1.0f);
+            vertsMat[0] = face.verts[0];
+            vertsMat[1] = face.verts[1];
+            vertsMat[2] = face.verts[2];
+
+            glm::vec4 fragPosLightSpace = shadowMatrix * glm::vec4(bc, 1.0);
+            glm::vec3 projCoords = fragPosLightSpace;
+            /* printf("%f %f %f %f\n", projCoords[0], projCoords[1], projCoords[2], projCoords[3]); */
+            projCoords[0] = projCoords[0] / projCoords[3];
+            projCoords[1] = projCoords[1] / projCoords[3];
+            projCoords[2] = projCoords[2] / projCoords[3];
+            /* printf("%f %f %f\n", projCoords[0], projCoords[1], projCoords[2]); */
+            projCoords = projCoords * glm::vec3(0.5) + glm::vec3(0.5); 
+            printf("%f %f %f\n", projCoords[0], projCoords[1], projCoords[2]);
+
+            /* printf("proj coords %d %d\n", int(projCoords[0]), int(projCoords[1])); */
+            int idx = int(projCoords[0] * width) + int(projCoords[1] * height) * width;
+            /* printf("proj coords %d %d\n", int(projCoords[0] * width), int(projCoords[1] * height)); */
+            float shadow = .3 + .7 * (image.shadowbuffer[idx] < projCoords[2]); // magic
+            /* printf("%f\n", shadow); */
+            /* printf("%i\n", idx); */
 
             P.z = 0;
             P.z += t0.z * bc[0];
@@ -228,7 +276,7 @@ void drawTriangleWithTexture(glm::vec3 t0, glm::vec3 t1, glm::vec3 t2, Image &im
                 intensity = pow(intensity, 2);
             }
 
-            glm::vec3 diffuseColor = sampleDiffuseTexture(offset, diffuseTexture) * intensity;
+            glm::vec3 diffuseColor = sampleDiffuseTexture(offset, diffuseTexture) * intensity * shadow;
             u8 rsrgb = u8(linearToSrgb(diffuseColor.r / 255.0f) * 255);
             u8 gsrgb = u8(linearToSrgb(diffuseColor.g / 255.0f) * 255);
             u8 bsrgb = u8(linearToSrgb(diffuseColor.b / 255.0f) * 255);
