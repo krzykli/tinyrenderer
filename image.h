@@ -156,7 +156,7 @@ glm::vec3 sampleNormalTexture(int offset, Png texture) {
     return textureNormal;
 }
 
-glm::vec3 sampleDiffuseTexture(int offset, Png texture) {
+glm::vec3 sampleTexture(int offset, Png texture) {
     unsigned char r = texture.buffer[offset];
     unsigned char g = texture.buffer[offset + 1];
     unsigned char b = texture.buffer[offset + 2];
@@ -195,10 +195,10 @@ void drawShadowbuffer(glm::vec3 t0, glm::vec3 t1, glm::vec3 t2, Image &image) {
 }
 
 void drawTriangleWithTexture(glm::vec3 t0, glm::vec3 t1, glm::vec3 t2, Image &image,
-                             Png diffuseTexture, Png normalMapTexture, Face face,
-                             glm::vec3 *normals, glm::vec3 lightDir, glm::mat4 model,
-                             glm::mat4 view, glm::mat4 perspective, glm::vec4 viewport,
-                             glm::mat4 shadowMatrix, App* app) {
+                             Png diffuseTexture, Png normalMapTexture, Png specTexture,
+                             Png glowTexture, Face face, glm::vec3 *normals, glm::vec3 lightDir,
+                             glm::mat4 model, glm::mat4 view, glm::mat4 perspective,
+                             glm::vec4 viewport, glm::mat4 shadowMatrix, App *app) {
     int minX = imin(imin(imin(t0.x, t1.x), t2.x), image.width - 1);
     int maxX = imax(imax(imax(t0.x, t1.x), t2.x), 0);
 
@@ -272,16 +272,17 @@ void drawTriangleWithTexture(glm::vec3 t0, glm::vec3 t1, glm::vec3 t2, Image &im
             glm::vec3 viewDir = glm::normalize(viewPos - bc);
             glm::vec3 halfwayDir = glm::normalize(lightDir + viewDir);
 
-            float shininess = 30.0f;
-            float specWeight = 0.4f; // sample
-            float spec = pow(fmaxf(glm::dot(normal, halfwayDir), 0.0), shininess);
+            float shininess = 40.0f;
+            /* float specWeight = 0.4f; // sample */
 
-            glm::vec3 diffuseColor =
-                sampleDiffuseTexture(offset, diffuseTexture);
+            glm::vec3 diffuseColor = sampleTexture(offset, diffuseTexture);
+            glm::vec3 glowColor = sampleTexture(offset, glowTexture);
+            float specWeight = sampleTexture(offset, specTexture)[0] / 255.0f;
+            float spec = pow(fmaxf(glm::dot(normal, halfwayDir), 0.0), shininess);
 
             glm::vec3 lightColor = glm::vec3(200, 200, 200);
 
-            glm::vec3 color = diffuseColor * intensity + lightColor * spec * specWeight;
+            glm::vec3 color = glowColor + (diffuseColor + lightColor * spec * specWeight) * intensity;
 
             u8 rsrgb = u8(linearToSrgb(fminf(color.r, 255) / 255.0f) * 255);
             u8 gsrgb = u8(linearToSrgb(fminf(color.g, 255) / 255.0f) * 255);

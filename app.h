@@ -22,7 +22,9 @@ typedef struct App {
     RenderMode renderMode;
 
     Png diffuseTexture;
+    Png specTexture;
     Png normalMapTexture;
+    Png glowTexture;
 
     float translateX;
     float translateY;

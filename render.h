@@ -46,6 +46,8 @@ void renderShape(Node *node, glm::mat4 perspective, glm::mat4 view, glm::vec4 vi
 
     Shape modelData = *(Shape *)node;
     Png diffuseTexture = app->diffuseTexture;
+    Png specTexture = app->specTexture;
+    Png glowTexture = app->glowTexture;
     Png normalMapTexture = app->normalMapTexture;
     for (int i = 0; i < modelData.faces.size(); i++) {
         Face face = modelData.faces[i];
@@ -82,8 +84,8 @@ void renderShape(Node *node, glm::mat4 perspective, glm::mat4 view, glm::vec4 vi
 
         glm::vec3 normalA = face.normals[0];
 
-        app->lightDir.y = cos(5 * glfwGetTime());
-        app->lightDir.x = sin(5 * glfwGetTime());
+        /* app->lightDir.y = cos(5 * glfwGetTime()); */
+        /* app->lightDir.x = sin(5 * glfwGetTime()); */
 
         u32 normalColor = int((normalA.x + 1) / 2 * 255) | int((normalA.y + 1) / 2 * 255) << 8 |
                           int((normalA.z + 1) / 2 * 255) << 16 | (0 << 24);
@@ -100,7 +102,7 @@ void renderShape(Node *node, glm::mat4 perspective, glm::mat4 view, glm::vec4 vi
 
                 drawTriangleWithTexture(
                     screenCoords[0], screenCoords[1], screenCoords[2], app->image, diffuseTexture,
-                    normalMapTexture, face, transformedNormals, glm::mat3(view) * app->lightDir,
+                    normalMapTexture, specTexture, glowTexture, face, transformedNormals, glm::mat3(view) * app->lightDir,
                     model, view, perspective, viewport, lightModelView, app);
 
             } else {

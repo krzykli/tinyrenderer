@@ -379,6 +379,7 @@ void initAppDefaults() {
     cam.pitch = 0.0f;
     app.camera = cam;
     app.diffuseTexture = {};
+    app.specTexture = {};
 
     app.normalLength = 0.1f;
     app.lightDir = glm::vec3(5, 5, 5);
@@ -601,6 +602,12 @@ int main(int argc, char **argv) {
 
     std::string normalMapTexture("../textures/diablo3_pose_nm_tangent.png");
     app.normalMapTexture = loadPNG(normalMapTexture.c_str());
+
+    std::string specTexture("../textures/diablo3_pose_spec.png");
+    app.specTexture = loadPNG(normalMapTexture.c_str());
+
+    std::string glowTexture("../textures/diablo3_pose_glow.png");
+    app.glowTexture = loadPNG(glowTexture.c_str());
 
     cr_plugin ctx;
     ctx.userdata = &app;
