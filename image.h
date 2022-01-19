@@ -198,7 +198,7 @@ void drawTriangleWithTexture(glm::vec3 t0, glm::vec3 t1, glm::vec3 t2, Image &im
                              Png diffuseTexture, Png normalMapTexture, Face face,
                              glm::vec3 *normals, glm::vec3 lightDir, glm::mat4 model,
                              glm::mat4 view, glm::mat4 perspective, glm::vec4 viewport,
-                             glm::mat4 shadowMatrix) {
+                             glm::mat4 shadowMatrix, App* app) {
     int minX = imin(imin(imin(t0.x, t1.x), t2.x), image.width - 1);
     int maxX = imax(imax(imax(t0.x, t1.x), t2.x), 0);
 
@@ -224,20 +224,13 @@ void drawTriangleWithTexture(glm::vec3 t0, glm::vec3 t1, glm::vec3 t2, Image &im
 
             glm::vec4 fragPosLightSpace = shadowMatrix * glm::vec4(bc, 1.0);
             glm::vec3 projCoords = fragPosLightSpace;
-            /* printf("%f %f %f %f\n", projCoords[0], projCoords[1], projCoords[2], projCoords[3]); */
             projCoords[0] = projCoords[0] / projCoords[3];
             projCoords[1] = projCoords[1] / projCoords[3];
             projCoords[2] = projCoords[2] / projCoords[3];
-            /* printf("%f %f %f\n", projCoords[0], projCoords[1], projCoords[2]); */
-            projCoords = projCoords * glm::vec3(0.5) + glm::vec3(0.5); 
-            printf("%f %f %f\n", projCoords[0], projCoords[1], projCoords[2]);
+            projCoords = projCoords * glm::vec3(0.5) + glm::vec3(0.5);
 
-            /* printf("proj coords %d %d\n", int(projCoords[0]), int(projCoords[1])); */
             int idx = int(projCoords[0] * width) + int(projCoords[1] * height) * width;
-            /* printf("proj coords %d %d\n", int(projCoords[0] * width), int(projCoords[1] * height)); */
             float shadow = .3 + .7 * (image.shadowbuffer[idx] < projCoords[2]); // magic
-            /* printf("%f\n", shadow); */
-            /* printf("%i\n", idx); */
 
             P.z = 0;
             P.z += t0.z * bc[0];
@@ -272,21 +265,34 @@ void drawTriangleWithTexture(glm::vec3 t0, glm::vec3 t1, glm::vec3 t2, Image &im
             float intensity = glm::dot(normal, glm::normalize(lightDir));
             if (intensity < 0) {
                 intensity = 0;
-            } else {
-                intensity = pow(intensity, 2);
             }
 
-            glm::vec3 diffuseColor = sampleDiffuseTexture(offset, diffuseTexture) * intensity * shadow;
-            u8 rsrgb = u8(linearToSrgb(diffuseColor.r / 255.0f) * 255);
-            u8 gsrgb = u8(linearToSrgb(diffuseColor.g / 255.0f) * 255);
-            u8 bsrgb = u8(linearToSrgb(diffuseColor.b / 255.0f) * 255);
+            glm::vec3 viewPos = app->camera.pos;
 
-            u32 color = rgbToU32(rsrgb, gsrgb, bsrgb);
+            glm::vec3 viewDir = glm::normalize(viewPos - bc);
+            glm::vec3 halfwayDir = glm::normalize(lightDir + viewDir);
+
+            float shininess = 30.0f;
+            float specWeight = 0.4f; // sample
+            float spec = pow(fmaxf(glm::dot(normal, halfwayDir), 0.0), shininess);
+
+            glm::vec3 diffuseColor =
+                sampleDiffuseTexture(offset, diffuseTexture);
+
+            glm::vec3 lightColor = glm::vec3(200, 200, 200);
+
+            glm::vec3 color = diffuseColor * intensity + lightColor * spec * specWeight;
+
+            u8 rsrgb = u8(linearToSrgb(fminf(color.r, 255) / 255.0f) * 255);
+            u8 gsrgb = u8(linearToSrgb(fminf(color.g, 255) / 255.0f) * 255);
+            u8 bsrgb = u8(linearToSrgb(fminf(color.b, 255) / 255.0f) * 255);
+
+            u32 color_out = rgbToU32(rsrgb, gsrgb, bsrgb);
 
             int coord = int(P.x + P.y * image.width);
             if (image.zbuffer[coord] < P.z) {
                 image.zbuffer[coord] = P.z;
-                drawPixel(P.x, P.y, color, image);
+                drawPixel(P.x, P.y, color_out, image);
             }
         }
     }

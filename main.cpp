@@ -133,6 +133,7 @@ void clearImage(Image &image) {
         image.buffer[i] = 0;
         image.zbuffer[i] = 0;
         image.shadowbuffer[i] = 0;
+        image.depth[i] = 0;
     }
 }
 
@@ -148,44 +149,44 @@ Png loadPNG(const char *filename) {
     return {.buffer = buffer, .width = width, .height = height};
 }
 
-void flipBuffersVertically(Image &image) {
-    int width = image.width;
-    int height = image.height;
-    unsigned rows = height / 2;
-    unsigned *tempRow = (u32 *)malloc(width * sizeof(u32));
+void flipBufferU32(void* buffer, int width, int height) {
+    float *tempRow = (float *)malloc(width * sizeof(u32));
 
-    for (unsigned rowIndex = 0; rowIndex < rows; rowIndex++) {
-        memcpy(tempRow, image.buffer + rowIndex * width, width * sizeof(u32));
-        memcpy(image.buffer + rowIndex * width, image.buffer + (height - rowIndex - 1) * width,
+    u32* start = (u32*)buffer;
+
+    for (int rowIndex = 0; rowIndex < height / 2; rowIndex++) {
+        memcpy(tempRow, start + rowIndex * width, width * sizeof(u32));
+        memcpy(start + rowIndex * width, start + (height - rowIndex - 1) * width,
                width * sizeof(u32));
-        memcpy(image.buffer + (height - rowIndex - 1) * width, tempRow, width * sizeof(u32));
+        memcpy(start + (height - rowIndex - 1) * width, tempRow,
+               width * sizeof(u32));
     }
 
     free(tempRow);
+}
+void flipBufferF(void* buffer, int width, int height) {
+    float *tempRow = (float *)malloc(width * sizeof(float));
 
-    float *tempRowZdepth = (float *)malloc(width * sizeof(float));
+    float* start = (float*)buffer;
 
-    for (int rowIndex = 0; rowIndex < rows; rowIndex++) {
-        memcpy(tempRowZdepth, image.zbuffer + rowIndex * width, width * sizeof(float));
-        memcpy(image.zbuffer + rowIndex * width, image.zbuffer + (height - rowIndex - 1) * width,
+    for (int rowIndex = 0; rowIndex < height / 2; rowIndex++) {
+        memcpy(tempRow, start + rowIndex * width, width * sizeof(float));
+        memcpy(start + rowIndex * width, start + (height - rowIndex - 1) * width,
                width * sizeof(float));
-        memcpy(image.zbuffer + (height - rowIndex - 1) * width, tempRowZdepth,
-               width * sizeof(float));
-    }
-
-    free(tempRowZdepth);
-
-    float *tempRowShadowbuffer = (float *)malloc(width * sizeof(float));
-
-    for (int rowIndex = 0; rowIndex < rows; rowIndex++) {
-        memcpy(tempRowShadowbuffer, image.shadowbuffer + rowIndex * width, width * sizeof(float));
-        memcpy(image.shadowbuffer + rowIndex * width, image.shadowbuffer + (height - rowIndex - 1) * width,
-               width * sizeof(float));
-        memcpy(image.shadowbuffer + (height - rowIndex - 1) * width, tempRowShadowbuffer,
+        memcpy(start + (height - rowIndex - 1) * width, tempRow,
                width * sizeof(float));
     }
 
-    free(tempRowShadowbuffer);
+    free(tempRow);
+}
+
+void flipBuffersVertically(Image &image) {
+    int width = image.width;
+    int height = image.height;
+    flipBufferU32(image.buffer, width, height);
+    flipBufferU32(image.depth, width, height);
+    flipBufferF(image.zbuffer, width, height);
+    flipBufferF(image.shadowbuffer, width, height);
 }
 
 void mouseButtonCallback(GLFWwindow *window, int button, int action, int mods) {
@@ -485,6 +486,8 @@ void calcTangentSpace(Face &face) {
     /* face.bitangent = glm::normalize((edge2 * deltaUV1.x   - edge1 * deltaUV2.x)*r); */
 }
 
+inline u32 rgbToU32(u8 r, u8 g, u8 b) { return r | g << 8 | b << 16 | (255 << 24); }
+
 int main(int argc, char **argv) {
     initAppDefaults();
     GLFWwindow *window = initGLWindow(app.resolutionX, app.resolutionY, app.appTitle);
@@ -502,6 +505,7 @@ int main(int argc, char **argv) {
     GLuint renderShaderProgramId = createShader("../shaders/render.vert", "../shaders/render.frag");
 
     app.image.buffer = (u32 *)malloc(BUFFER_WIDTH * BUFFER_HEIGHT * sizeof(u32));
+    app.image.depth = (u32 *)malloc(BUFFER_WIDTH * BUFFER_HEIGHT * sizeof(u32));
     app.image.zbuffer = (float *)malloc(BUFFER_WIDTH * BUFFER_HEIGHT * sizeof(float));
     app.image.shadowbuffer = (float *)malloc(BUFFER_WIDTH * BUFFER_HEIGHT * sizeof(float));
     app.image.width = BUFFER_WIDTH;
@@ -529,18 +533,18 @@ int main(int argc, char **argv) {
     world.worldRoot = &worldRoot;
     app.world = &world;
 
-    std::string currentObj("../obj/african_head.obj");
+    std::string currentObj("../obj/diablo3_pose.obj");
 
     Transform t1;
     t1.node.parent = &worldRoot;
     t1.node.children = std::vector<Node *>();
-    t1.node.name = "african_head_root";
+    t1.node.name = "diablo3_pose_root";
     t1.node.type = "transform";
     t1.matrix = glm::translate(glm::mat4(1), glm::vec3(0.0f, 0.0f, 0.0f));
 
     Shape shape;
     shape.node.parent = (Node *)&t1;
-    shape.node.name = "african_head";
+    shape.node.name = "diablo3_pose";
     shape.node.type = "shape";
     shape.node.children = std::vector<Node *>();
     loadOBJ(currentObj.c_str(), shape.faces, shape.vertices, shape.uvs, shape.normals);
@@ -589,13 +593,13 @@ int main(int argc, char **argv) {
 
     shape.node.parent = &worldRoot;
     worldRoot.children.push_back((Node *)&t1);
-    worldRoot.children.push_back((Node *)&t2);
-    worldRoot.children.push_back((Node *)&t3);
+    /* worldRoot.children.push_back((Node *)&t2); */
+    /* worldRoot.children.push_back((Node *)&t3); */
 
-    std::string diffuseTexture("../textures/african_head_diffuse.png");
+    std::string diffuseTexture("../textures/diablo3_pose_diffuse.png");
     app.diffuseTexture = loadPNG(diffuseTexture.c_str());
 
-    std::string normalMapTexture("../textures/african_head_nm_tangent.png");
+    std::string normalMapTexture("../textures/diablo3_pose_nm_tangent.png");
     app.normalMapTexture = loadPNG(normalMapTexture.c_str());
 
     cr_plugin ctx;
@@ -651,14 +655,32 @@ int main(int argc, char **argv) {
                             GL_UNSIGNED_BYTE, app.image.zbuffer);
         }
         else if (app.renderMode == SHADOWBUFFER) {
+            float minDepth = 100000000.0f;
+            float maxDepth = 0;
             for (int i = 0; i < app.image.width * app.image.height; i++) {
                 float z = app.image.shadowbuffer[i];
                 if (z > 0) {
-                    app.image.shadowbuffer[i] = powf(z, zdepthExponent);
+                    float value = app.image.shadowbuffer[i];
+                    if (value < minDepth) {
+                        minDepth = value;
+                    }
+                    else if (value > maxDepth) {
+                        maxDepth = value;
+                    }
                 }
             }
+
+            for (int i = 0; i < app.image.width * app.image.height; i++) {
+                float z = app.image.shadowbuffer[i];
+                if (z > 0) {
+                    float scale = (z - minDepth) / (maxDepth - minDepth);
+                    printf("%f\n", scale);
+                    app.image.depth[i] = rgbToU32(u8(255.0f * scale), u8(255.0f * scale), u8(255.0f * scale));
+                }
+            }
+
             glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, app.image.width, app.image.height, GL_RGBA,
-                            GL_UNSIGNED_BYTE, app.image.shadowbuffer);
+                            GL_UNSIGNED_BYTE, app.image.depth);
         } else {
             glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, app.image.width, app.image.height, GL_RGBA,
                             GL_UNSIGNED_BYTE, app.image.buffer);
@@ -750,7 +772,7 @@ int main(int argc, char **argv) {
 
                 ImGui::SliderFloat3("light dir", &app.lightDir.x, -5.0f, 5.0f);
                 ImGui::SliderFloat("normal length", &app.normalLength, 0.01f, 1.0f);
-                ImGui::SliderFloat("zdepth exp", &zdepthExponent, 0.001f, 0.015f);
+                ImGui::SliderFloat("zdepth exp", &zdepthExponent, 0.001f, 4.015f);
 
                 ImGui::Separator();
                 ImGui::Checkbox("Turntable", &app.turntable);
@@ -806,6 +828,7 @@ int main(int argc, char **argv) {
     // Cleanup
     free(app.diffuseTexture.buffer);
     free(app.image.buffer);
+    free(app.image.depth);
     free(app.image.zbuffer);
     free(app.image.shadowbuffer);
     destroyImGui();

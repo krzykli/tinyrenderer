@@ -28,6 +28,7 @@ typedef struct Camera {
 
 typedef struct Image {
     u32 *buffer;
+    u32 *depth;
     float *zbuffer;
     float *shadowbuffer;
     u32 width;

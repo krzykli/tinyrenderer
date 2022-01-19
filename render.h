@@ -34,7 +34,7 @@ void renderShape(Node *node, glm::mat4 perspective, glm::mat4 view, glm::vec4 vi
     float far_plane = 10000.0f;
     glm::mat4 lightProjection = glm::ortho(-10.0f, 10.0f, -10.0f, 10.0f, near_plane, far_plane);
     glm::mat4 lightView =
-        glm::lookAt(app->lightDir, glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 1.0f, 0.0f));
+        glm::lookAt(-app->lightDir, glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 1.0f, 0.0f));
     glm::mat4 lightSpaceMatrix = lightProjection * lightView;
 
     glm::mat4 parentWorldMatrix = glm::mat4(1);
@@ -82,8 +82,8 @@ void renderShape(Node *node, glm::mat4 perspective, glm::mat4 view, glm::vec4 vi
 
         glm::vec3 normalA = face.normals[0];
 
-        /* app->lightDir.y = cos(2 * glfwGetTime()); */
-        /* app->lightDir.x = sin(2 * glfwGetTime()); */
+        app->lightDir.y = cos(5 * glfwGetTime());
+        app->lightDir.x = sin(5 * glfwGetTime());
 
         u32 normalColor = int((normalA.x + 1) / 2 * 255) | int((normalA.y + 1) / 2 * 255) << 8 |
                           int((normalA.z + 1) / 2 * 255) << 16 | (0 << 24);
@@ -101,7 +101,7 @@ void renderShape(Node *node, glm::mat4 perspective, glm::mat4 view, glm::vec4 vi
                 drawTriangleWithTexture(
                     screenCoords[0], screenCoords[1], screenCoords[2], app->image, diffuseTexture,
                     normalMapTexture, face, transformedNormals, glm::mat3(view) * app->lightDir,
-                    model, view, perspective, viewport, lightModelView);
+                    model, view, perspective, viewport, lightModelView, app);
 
             } else {
                 float intensity =
