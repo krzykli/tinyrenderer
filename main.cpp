@@ -134,6 +134,7 @@ void clearImage(Image &image) {
         image.zbuffer[i] = 0;
         image.shadowbuffer[i] = 0;
         image.depth[i] = 0;
+        image.glow[i] = 0;
     }
 }
 
@@ -185,9 +186,11 @@ void flipBuffersVertically(Image &image) {
     int height = image.height;
     flipBufferU32(image.buffer, width, height);
     flipBufferU32(image.depth, width, height);
+    flipBufferU32(image.glow, width, height);
     flipBufferF(image.zbuffer, width, height);
     flipBufferF(image.shadowbuffer, width, height);
 }
+
 
 void mouseButtonCallback(GLFWwindow *window, int button, int action, int mods) {
     if (button == GLFW_MOUSE_BUTTON_LEFT) {
@@ -507,6 +510,8 @@ int main(int argc, char **argv) {
 
     app.image.buffer = (u32 *)malloc(BUFFER_WIDTH * BUFFER_HEIGHT * sizeof(u32));
     app.image.depth = (u32 *)malloc(BUFFER_WIDTH * BUFFER_HEIGHT * sizeof(u32));
+    app.image.glow = (u32 *)malloc(BUFFER_WIDTH * BUFFER_HEIGHT * sizeof(u32));
+    u32* glowBlurred = (u32 *)malloc(BUFFER_WIDTH * BUFFER_HEIGHT * sizeof(float));
     app.image.zbuffer = (float *)malloc(BUFFER_WIDTH * BUFFER_HEIGHT * sizeof(float));
     app.image.shadowbuffer = (float *)malloc(BUFFER_WIDTH * BUFFER_HEIGHT * sizeof(float));
     app.image.width = BUFFER_WIDTH;
@@ -681,7 +686,6 @@ int main(int argc, char **argv) {
                 float z = app.image.shadowbuffer[i];
                 if (z > 0) {
                     float scale = (z - minDepth) / (maxDepth - minDepth);
-                    printf("%f\n", scale);
                     app.image.depth[i] = rgbToU32(u8(255.0f * scale), u8(255.0f * scale), u8(255.0f * scale));
                 }
             }
@@ -837,6 +841,8 @@ int main(int argc, char **argv) {
     free(app.image.buffer);
     free(app.image.depth);
     free(app.image.zbuffer);
+    free(app.image.glow);
+    free(glowBlurred);
     free(app.image.shadowbuffer);
     destroyImGui();
 

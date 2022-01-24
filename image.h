@@ -16,6 +16,10 @@ void drawPixel(u32 x, u32 y, u32 color, Image &image) {
     }
 }
 
+void printVec3(const char *label, glm::vec3 vector) {
+    printf("%s x:%f y:%f z:%f\n", label, vector.x, vector.y, vector.z);
+}
+
 void drawLine(glm::vec3 v0, glm::vec3 v1, Image &image, u32 color) {
 
     int x0 = v0.x;
@@ -189,7 +193,9 @@ void drawShadowbuffer(glm::vec3 t0, glm::vec3 t1, glm::vec3 t2, Image &image) {
             P.z += t2.z * bc[2];
 
             int coord = int(P.x + P.y * image.width);
-            image.shadowbuffer[coord] = P.z;
+            if (image.shadowbuffer[coord] < P.z) {
+                image.shadowbuffer[coord] = P.z;
+            }
         }
     }
 }
@@ -198,44 +204,51 @@ void drawTriangleWithTexture(glm::vec3 t0, glm::vec3 t1, glm::vec3 t2, Image &im
                              Png diffuseTexture, Png normalMapTexture, Png specTexture,
                              Png glowTexture, Face face, glm::vec3 *normals, glm::vec3 lightDir,
                              glm::mat4 model, glm::mat4 view, glm::mat4 perspective,
-                             glm::vec4 viewport, glm::mat4 shadowMatrix, App *app) {
+                             glm::vec4 viewport, glm::mat4 lightModelView, App *app) {
     int minX = imin(imin(imin(t0.x, t1.x), t2.x), image.width - 1);
     int maxX = imax(imax(imax(t0.x, t1.x), t2.x), 0);
 
     int minY = imin(imin(imin(t0.y, t1.y), t2.y), image.height - 1);
     int maxY = imax(imax(imax(t0.y, t1.y), t2.y), 0);
 
-    glm::vec3 P;
+    glm::vec3 frag;
     u32 width = diffuseTexture.width;
     u32 height = diffuseTexture.height;
 
-    for (P.x = minX; P.x <= maxX; P.x++) {
-        for (P.y = minY; P.y <= maxY; P.y++) {
+    for (frag.x = minX; frag.x <= maxX; frag.x++) {
+        for (frag.y = minY; frag.y <= maxY; frag.y++) {
 
-            glm::vec3 bc = barycentric(t0, t1, t2, P);
+            glm::vec3 bc = barycentric(t0, t1, t2, frag);
+
+            frag.z = 0;
+            frag.z += t0.z * bc[0];
+            frag.z += t1.z * bc[1];
+            frag.z += t2.z * bc[2];
 
             if (bc.x < 0 || bc.y < 0 || bc.z < 0)
                 continue;
 
-            glm::mat3 vertsMat(1.0f);
-            vertsMat[0] = face.verts[0];
-            vertsMat[1] = face.verts[1];
-            vertsMat[2] = face.verts[2];
+            glm::vec3 originalPoint = glm::unProject(frag, view * model, perspective, viewport);
 
-            glm::vec4 fragPosLightSpace = shadowMatrix * glm::vec4(bc, 1.0);
-            glm::vec3 projCoords = fragPosLightSpace;
-            projCoords[0] = projCoords[0] / projCoords[3];
-            projCoords[1] = projCoords[1] / projCoords[3];
-            projCoords[2] = projCoords[2] / projCoords[3];
-            projCoords = projCoords * glm::vec3(0.5) + glm::vec3(0.5);
+            glm::mat4 lightView =
+                glm::lookAt(app->lightDir, glm::vec3(0.0f), glm::vec3(0.0f, 1.0f, 0.0f));
+            float near_plane = 1.0f;
+            float far_plane = 10000.0f;
+            glm::mat4 lightProjection =
+                glm::ortho(-1.0f, 1.0f, -1.0f, 1.0f, near_plane, far_plane);
 
-            int idx = int(projCoords[0] * width) + int(projCoords[1] * height) * width;
-            float shadow = .3 + .7 * (image.shadowbuffer[idx] < projCoords[2]); // magic
+            glm::vec3 projCoords = glm::project(glm::vec3(originalPoint), lightModelView, perspective, viewport);
+            projCoords.x = int(projCoords.x);
+            projCoords.y = int(projCoords.y);
 
-            P.z = 0;
-            P.z += t0.z * bc[0];
-            P.z += t1.z * bc[1];
-            P.z += t2.z * bc[2];
+            int idx = projCoords.x + app->image.width * projCoords.y;
+            /* printf("x: %f y: %f ->index %i\n", projCoords.x, projCoords.y, idx); */
+            /* printf("shadowbuffer %f\n", image.shadowbuffer[idx]); */
+            /* float shadow = .3 + .7 * (image.shadowbuffer[idx] < (projCoords)[2]); // magic */
+            float shadow = 0.3 + .7 * (image.shadowbuffer[idx] - 0.0001 < projCoords.z); // magic
+            if (shadow) {
+                /* drawPixel(frag.x, frag.y, WHITE, image); */
+            }
 
             glm::mat3 modelVector = glm::transpose(glm::inverse(glm::mat3(view * model)));
 
@@ -282,7 +295,8 @@ void drawTriangleWithTexture(glm::vec3 t0, glm::vec3 t1, glm::vec3 t2, Image &im
 
             glm::vec3 lightColor = glm::vec3(200, 200, 200);
 
-            glm::vec3 color = glowColor + (diffuseColor + lightColor * spec * specWeight) * intensity;
+            glm::vec3 color =
+                glowColor + (diffuseColor + lightColor * spec * specWeight) * intensity * shadow;
 
             u8 rsrgb = u8(linearToSrgb(fminf(color.r, 255) / 255.0f) * 255);
             u8 gsrgb = u8(linearToSrgb(fminf(color.g, 255) / 255.0f) * 255);
@@ -290,10 +304,10 @@ void drawTriangleWithTexture(glm::vec3 t0, glm::vec3 t1, glm::vec3 t2, Image &im
 
             u32 color_out = rgbToU32(rsrgb, gsrgb, bsrgb);
 
-            int coord = int(P.x + P.y * image.width);
-            if (image.zbuffer[coord] < P.z) {
-                image.zbuffer[coord] = P.z;
-                drawPixel(P.x, P.y, color_out, image);
+            int coord = int(frag.x + frag.y * image.width);
+            if (image.zbuffer[coord] < frag.z) {
+                image.zbuffer[coord] = frag.z;
+                drawPixel(frag.x, frag.y, color_out, image);
             }
         }
     }

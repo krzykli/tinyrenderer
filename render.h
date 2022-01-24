@@ -32,10 +32,9 @@ void drawAxis(glm::mat4 view, glm::mat4 perspective, glm::vec4 viewport, Image i
 void renderShape(Node *node, glm::mat4 perspective, glm::mat4 view, glm::vec4 viewport, App *app) {
     float near_plane = 1.0f;
     float far_plane = 10000.0f;
-    glm::mat4 lightProjection = glm::ortho(-10.0f, 10.0f, -10.0f, 10.0f, near_plane, far_plane);
-    glm::mat4 lightView =
-        glm::lookAt(-app->lightDir, glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 1.0f, 0.0f));
-    glm::mat4 lightSpaceMatrix = lightProjection * lightView;
+    glm::mat4 lightProjection = perspective;
+    glm::mat4 lightView = glm::lookAt(app->lightDir, glm::vec3(0.0f), glm::vec3(0.0f, 1.0f, 0.0f));
+    glm::mat4 lightSpaceMatrix = lightView;
 
     glm::mat4 parentWorldMatrix = glm::mat4(1);
     Node *parentNode = node->parent;
@@ -58,9 +57,9 @@ void renderShape(Node *node, glm::mat4 perspective, glm::mat4 view, glm::vec4 vi
         glm::mat4 scale = glm::scale(glm::vec3(app->scale, app->scale, app->scale));
         glm::mat4 translation = glm::translate(glm::vec3(app->translateX, app->translateY, 0));
 
-        glm::mat4 model = rotation;
-        glm::mat4 modelView = view * parentWorldMatrix * model;
-        glm::mat4 lightModelView = lightSpaceMatrix * parentWorldMatrix * model;
+        glm::mat4 model = parentWorldMatrix * rotation;
+        glm::mat4 modelView = view * model;
+        glm::mat4 lightModelView = lightSpaceMatrix * model;
 
         glm::vec3 transformedVertices[3];
         glm::vec3 transformedNormals[3];
@@ -78,8 +77,7 @@ void renderShape(Node *node, glm::mat4 perspective, glm::mat4 view, glm::vec4 vi
             transformedNormals[j] = transformedNormal;
 
             screenCoords[j] = glm::project(glm::vec3(vertex), modelView, perspective, viewport);
-            lightSpaceCoords[j] =
-                glm::project(glm::vec3(vertex), lightModelView, perspective, viewport);
+            lightSpaceCoords[j] = glm::project(glm::vec3(vertex), lightModelView, lightProjection, viewport);
         }
 
         glm::vec3 normalA = face.normals[0];
@@ -100,10 +98,11 @@ void renderShape(Node *node, glm::mat4 perspective, glm::mat4 view, glm::vec4 vi
                 drawShadowbuffer(lightSpaceCoords[0], lightSpaceCoords[1], lightSpaceCoords[2],
                                  app->image);
 
-                drawTriangleWithTexture(
-                    screenCoords[0], screenCoords[1], screenCoords[2], app->image, diffuseTexture,
-                    normalMapTexture, specTexture, glowTexture, face, transformedNormals, glm::mat3(view) * app->lightDir,
-                    model, view, perspective, viewport, lightModelView, app);
+                drawTriangleWithTexture(screenCoords[0], screenCoords[1], screenCoords[2],
+                                        app->image, diffuseTexture, normalMapTexture, specTexture,
+                                        glowTexture, face, transformedNormals,
+                                        glm::mat3(view) * app->lightDir, model, view, perspective,
+                                        viewport, lightModelView, app);
 
             } else {
                 float intensity =
