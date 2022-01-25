@@ -13,136 +13,328 @@
 #include <glm/gtx/string_cast.hpp>
 #include <glm/gtx/transform.hpp>
 
-void drawAxis(glm::mat4 view, glm::mat4 perspective, glm::vec4 viewport, Image image) {
+void drawAxis(glm::mat4 view, glm::mat4 projection, glm::vec4 viewport, Image image) {
     glm::vec3 origin(0, 0, 0);
-    glm::vec3 projectedOrigin = glm::project(origin, view, perspective, viewport);
+    glm::vec3 projectedOrigin = glm::project(origin, view, projection, viewport);
     glm::vec3 xAxis = glm::vec3(1, 0, 0);
     glm::vec3 yAxis = glm::vec3(0, 1, 0);
     glm::vec3 zAxis = glm::vec3(0, 0, 1);
 
-    glm::vec3 projectedxAxis = glm::project(xAxis, view, perspective, viewport);
-    glm::vec3 projectedyAxis = glm::project(yAxis, view, perspective, viewport);
-    glm::vec3 projectedzAxis = glm::project(zAxis, view, perspective, viewport);
+    glm::vec3 projectedxAxis = glm::project(xAxis, view, projection, viewport);
+    glm::vec3 projectedyAxis = glm::project(yAxis, view, projection, viewport);
+    glm::vec3 projectedzAxis = glm::project(zAxis, view, projection, viewport);
 
     drawLine(projectedOrigin, projectedxAxis, image, RED);
     drawLine(projectedOrigin, projectedyAxis, image, GREEN);
     drawLine(projectedOrigin, projectedzAxis, image, BLUE);
 }
 
-void renderShape(Node *node, glm::mat4 perspective, glm::mat4 view, glm::vec4 viewport, App *app) {
-    float near_plane = 1.0f;
-    float far_plane = 10000.0f;
-    glm::mat4 lightProjection = perspective;
-    glm::mat4 lightView = glm::lookAt(app->lightDir, glm::vec3(0.0f), glm::vec3(0.0f, 1.0f, 0.0f));
-    glm::mat4 lightSpaceMatrix = lightView;
-
-    glm::mat4 parentWorldMatrix = glm::mat4(1);
+glm::mat4 getParentMatrix(Node *node) {
+    glm::mat4 matrix = glm::mat4(1);
     Node *parentNode = node->parent;
     if (!strcmp(parentNode->type, "transform")) {
         Transform transform = *(Transform *)parentNode;
-        parentWorldMatrix = transform.matrix;
+        matrix = transform.matrix;
+    }
+    return matrix;
+}
+
+typedef struct DefaultVertexShaderOut {
+    glm::vec3 position[3];
+    glm::vec3 normals[3];
+} DefaultVertexShaderOut;
+
+typedef struct DefaultVertexShaderIn {
+    Face face;
+    glm::mat4 model;
+    glm::mat4 view;
+    glm::mat4 projection;
+    glm::vec4 viewport;
+} DefaultVertexShaderIn;
+
+typedef struct PhongFragmentShaderIn {
+    glm::vec3 *position;
+    Face face;
+
+    u32 *buffer;
+    u32 bufferWidth;
+    u32 bufferHeight;
+
+    glm::vec3 lightDir;
+    Png diffuseTexture;
+    Png normalMapTexture;
+    Png specTexture;
+    Png glowTexture;
+
+    glm::vec3 camPos;
+    glm::mat4 model;
+    glm::mat4 view;
+    glm::mat4 projection;
+    glm::vec4 viewport;
+
+    Image image;
+} PhongFragmentShaderIn;
+
+typedef struct ShadowFragmentShaderIn {
+    glm::vec3 *position;
+    u32 *buffer;
+    u32 bufferWidth;
+    u32 bufferHeight;
+} ShadowFragmentShaderIn;
+
+typedef struct PhongFragmentShaderOut {
+    glm::vec2 screenCoords;
+    glm::vec3 color;
+} PhongFragmentShaderOut;
+
+DefaultVertexShaderOut runDefaultVertexProgram(DefaultVertexShaderIn in) {
+    glm::mat4 modelView = in.view * in.model;
+
+    DefaultVertexShaderOut vertexOut;
+
+    for (int i = 0; i < 3; i++) {
+        glm::vec3 v0 = in.face.verts[i];
+        glm::vec4 vertex = glm::vec4(v0.x, v0.y, v0.z, 1);
+
+        glm::vec3 n0 = in.face.normals[i];
+        glm::vec4 normal = glm::vec4(n0.x, n0.y, n0.z, 1);
+        glm::mat4 normalModelMatrix = glm::transpose(glm::inverse(modelView));
+        glm::vec3 transformedNormal = glm::normalize(glm::vec3(normalModelMatrix * normal));
+        vertexOut.normals[i] = transformedNormal;
+
+        vertexOut.position[i] =
+            glm::project(glm::vec3(vertex), modelView, in.projection, in.viewport);
     }
 
-    Shape modelData = *(Shape *)node;
-    Png diffuseTexture = app->diffuseTexture;
-    Png specTexture = app->specTexture;
-    Png glowTexture = app->glowTexture;
-    Png normalMapTexture = app->normalMapTexture;
-    for (int i = 0; i < modelData.faces.size(); i++) {
-        Face face = modelData.faces[i];
-        glm::vec3 screenCoords[3];
-        glm::vec3 lightSpaceCoords[3];
+    return vertexOut;
+}
 
-        glm::mat4 rotation = glm::rotate(glm::radians(app->rotateY), glm::vec3(0, 1, 0));
-        glm::mat4 scale = glm::scale(glm::vec3(app->scale, app->scale, app->scale));
-        glm::mat4 translation = glm::translate(glm::vec3(app->translateX, app->translateY, 0));
+glm::vec3 computeBarycentricCoords(glm::vec3 A, glm::vec3 B, glm::vec3 C, glm::vec3 P) {
+    glm::vec3 s[2];
+    for (int i = 2; i--;) {
+        s[i][0] = C[i] - A[i];
+        s[i][1] = B[i] - A[i];
+        s[i][2] = A[i] - P[i];
+    }
+    glm::vec3 u = cross(s[0], s[1]);
+    if (std::abs(u[2]) > 1e-2)
+        return glm::vec3(1.f - (u.x + u.y) / u.z, u.y / u.z, u.x / u.z);
+    return glm::vec3(-1, 1, 1);
+}
 
-        glm::mat4 model = parentWorldMatrix * rotation;
-        glm::mat4 modelView = view * model;
-        glm::mat4 lightModelView = lightSpaceMatrix * model;
+void runShadowFragmentProgram(ShadowFragmentShaderIn in) {
+    glm::vec3 p0 = in.position[0];
+    glm::vec3 p1 = in.position[1];
+    glm::vec3 p2 = in.position[2];
 
-        glm::vec3 transformedVertices[3];
-        glm::vec3 transformedNormals[3];
+    int minX = imin(imin(imin(p0.x, p1.x), p2.x), in.bufferWidth - 1);
+    int maxX = imax(imax(imax(p0.x, p1.x), p2.x), 0);
 
-        for (int j = 0; j < 3; j++) {
-            glm::vec3 v0 = face.verts[j];
-            glm::vec4 vertex = glm::vec4(v0.x, v0.y, v0.z, 1);
-            glm::vec4 transformedVertex = perspective * modelView * vertex;
-            transformedVertices[j] = transformedVertex;
+    int minY = imin(imin(imin(p0.y, p1.y), p2.y), in.bufferHeight - 1);
+    int maxY = imax(imax(imax(p0.y, p1.y), p2.y), 0);
 
-            glm::vec3 n0 = face.normals[j];
-            glm::vec4 normal = glm::vec4(n0.x, n0.y, n0.z, 1);
-            glm::mat4 normalModelMatrix = glm::transpose(glm::inverse(modelView));
-            glm::vec3 transformedNormal = glm::normalize(glm::vec3(normalModelMatrix * normal));
-            transformedNormals[j] = transformedNormal;
+    glm::vec3 frag;
 
-            screenCoords[j] = glm::project(glm::vec3(vertex), modelView, perspective, viewport);
-            lightSpaceCoords[j] = glm::project(glm::vec3(vertex), lightModelView, lightProjection, viewport);
-        }
+    for (frag.x = minX; frag.x <= maxX; frag.x++) {
+        for (frag.y = minY; frag.y <= maxY; frag.y++) {
 
-        glm::vec3 normalA = face.normals[0];
+            glm::vec3 barCoords = computeBarycentricCoords(p0, p1, p2, frag);
 
-        /* app->lightDir.y = cos(5 * glfwGetTime()); */
-        /* app->lightDir.x = sin(5 * glfwGetTime()); */
+            if (barCoords.x < 0 || barCoords.y < 0 || barCoords.z < 0)
+                continue;
 
-        u32 normalColor = int((normalA.x + 1) / 2 * 255) | int((normalA.y + 1) / 2 * 255) << 8 |
-                          int((normalA.z + 1) / 2 * 255) << 16 | (0 << 24);
+            frag.z = 0;
+            frag.z += p0.z * barCoords[0];
+            frag.z += p1.z * barCoords[1];
+            frag.z += p2.z * barCoords[2];
 
-        switch (app->renderMode) {
-
-        case ZBUFFER:
-        case SHADOWBUFFER:
-        case TRIANGLES: {
-
-            if (true) {
-                drawShadowbuffer(lightSpaceCoords[0], lightSpaceCoords[1], lightSpaceCoords[2],
-                                 app->image);
-
-                drawTriangleWithTexture(screenCoords[0], screenCoords[1], screenCoords[2],
-                                        app->image, diffuseTexture, normalMapTexture, specTexture,
-                                        glowTexture, face, transformedNormals,
-                                        glm::mat3(view) * app->lightDir, model, view, perspective,
-                                        viewport, lightModelView, app);
-
-            } else {
-                float intensity =
-                    glm::dot(glm::vec3(transformedNormals[0]), glm::normalize(app->lightDir));
-                if (intensity < 0)
-                    intensity = 0;
-
-                u32 color = int(255 * intensity) | int(255 * intensity) << 8 |
-                            int(255 * intensity) << 16 | (0 << 24);
-                drawTriangle(screenCoords[0], screenCoords[1], screenCoords[2], app->image, color);
+            int coord = int(frag.x + frag.y * in.bufferWidth);
+            if (in.buffer[coord] < frag.z) {
+                in.buffer[coord] = frag.z;
             }
-            break;
-        }
-
-        case POINTS:
-            for (int i = 0; i < 3; i++) {
-                glm::vec2 coords = glm::ivec2(screenCoords[i]);
-                drawPixel(coords.x, coords.y, normalColor, app->image);
-            }
-            break;
-
-        case NORMALS:
-            glm::vec3 normalEnd = face.verts[0] + normalA * app->normalLength;
-            glm::vec3 screenCoordsEnd =
-                glm::project(glm::vec3(normalEnd), modelView, perspective, viewport);
-            drawLine(screenCoords[0], screenCoordsEnd, app->image, normalColor);
-            break;
         }
     }
 }
 
-void renderWorld_r(Node *root, App *app, glm::mat4 perspective, glm::mat4 view,
-                   glm::vec4 viewport) {
+void runPhongFragmentProgram(PhongFragmentShaderIn in) {
+    glm::vec3 p0 = in.position[0];
+    glm::vec3 p1 = in.position[1];
+    glm::vec3 p2 = in.position[2];
+
+    int minX = imin(imin(imin(p0.x, p1.x), p2.x), in.bufferWidth - 1);
+    int maxX = imax(imax(imax(p0.x, p1.x), p2.x), 0);
+
+    int minY = imin(imin(imin(p0.y, p1.y), p2.y), in.bufferHeight - 1);
+    int maxY = imax(imax(imax(p0.y, p1.y), p2.y), 0);
+
+    glm::vec3 frag;
+
+    glm::mat4 modelView = in.view * in.model;
+
+    u32 textureWidth = in.diffuseTexture.width; // all of them are the same
+    u32 textureHeight = in.diffuseTexture.height;
+
+    for (frag.x = minX; frag.x <= maxX; frag.x++) {
+        for (frag.y = minY; frag.y <= maxY; frag.y++) {
+
+            glm::vec3 barCoords = computeBarycentricCoords(p0, p1, p2, frag);
+
+            if (barCoords.x < 0 || barCoords.y < 0 || barCoords.z < 0)
+                continue;
+
+            frag.z = 0;
+            frag.z += p0.z * barCoords[0];
+            frag.z += p1.z * barCoords[1];
+            frag.z += p2.z * barCoords[2];
+
+            glm::vec3 originalPoint = glm::unProject(frag, modelView, in.projection, in.viewport);
+
+            glm::mat3 modelVector = glm::transpose(glm::inverse(glm::mat3(modelView)));
+
+            glm::vec3 uv = toBarycentric(barCoords, in.face.uvs);
+            glm::vec3 barycentricNormal = toBarycentric(barCoords, in.face.normals);
+
+            glm::mat3 tangentSpace;
+            glm::vec3 edge1 = p1 - p0;
+            glm::vec3 edge2 = p2 - p0;
+
+            glm::vec3 T = glm::normalize(modelVector * in.face.tangent);
+            glm::vec3 B = glm::normalize(modelVector * in.face.bitangent);
+            glm::vec3 N = glm::normalize(barycentricNormal);
+
+            tangentSpace[0] = T;
+            tangentSpace[1] = B;
+            tangentSpace[2] = N;
+
+            u32 x = textureWidth * uv.x;
+            u32 y = textureHeight * uv.y;
+
+            u32 offset = (y * textureWidth + x) * 4;
+
+            glm::vec3 textureNormal = sampleNormalTexture(offset, in.normalMapTexture);
+            glm::vec3 normal = glm::normalize(tangentSpace * textureNormal);
+
+            float intensity = glm::dot(normal, glm::normalize(in.lightDir));
+            if (intensity < 0) {
+                intensity = 0;
+            }
+
+            glm::vec3 viewPos = in.camPos;
+            glm::vec3 viewDir = glm::normalize(viewPos - frag);
+            glm::vec3 halfwayDir = glm::normalize(in.lightDir + viewDir);
+
+            glm::vec3 diffuseColor = sampleTexture(offset, in.diffuseTexture);
+            glm::vec3 glowColor = sampleTexture(offset, in.glowTexture);
+            float specWeight = sampleTexture(offset, in.specTexture)[0] / 255.0f;
+
+            float shininess = 40.0f;
+            float spec = pow(fmaxf(glm::dot(normal, halfwayDir), 0.0), shininess);
+
+            glm::vec3 lightColor = glm::vec3(255, 200, 200);
+
+            // shadow
+            /* glm::mat4 lightView = */
+            /*     glm::lookAt(in.lightDir, glm::vec3(0.0f), glm::vec3(0.0f, 1.0f, 0.0f)); */
+            /* float near_plane = 1.0f; */
+            /* float far_plane = 10000.0f; */
+            /* glm::mat4 lightProjection = glm::ortho(-2.0f, 2.0f, -1.0f, 1.0f, near_plane, far_plane); */
+
+            /* glm::vec3 projCoords = */
+            /*     glm::project(glm::vec3(originalPoint), lightModelView, in.projection, in.viewport); */
+            /* projCoords.x = int(projCoords.x); */
+            /* projCoords.y = int(projCoords.y); */
+
+            /* int idx = projCoords.x + app->image.width * projCoords.y; */
+            /* float shadow = 0.3 + .7 * (image.shadowbuffer[idx] - 0.000005 < projCoords.z); // */
+
+            /* glm::vec3 color = glowColor * glm::vec3(2) + */
+            /*                   (diffuseColor + lightColor * spec * specWeight) * intensity * shadow; */
+            //
+            glm::vec3 color = glowColor * glm::vec3(2) +
+                              (diffuseColor + lightColor * spec * specWeight) * intensity;
+
+            u8 rsrgb = u8(linearToSrgb(fminf(color.r, 255) / 255.0f) * 255);
+            u8 gsrgb = u8(linearToSrgb(fminf(color.g, 255) / 255.0f) * 255);
+            u8 bsrgb = u8(linearToSrgb(fminf(color.b, 255) / 255.0f) * 255);
+
+            u32 color_out = rgbToU32(rsrgb, gsrgb, bsrgb);
+
+            int coord = int(frag.x + frag.y * in.image.width);
+            if (in.image.zbuffer[coord] < frag.z) {
+                in.image.zbuffer[coord] = frag.z;
+                /* if (shadow) { */
+                /*     /1* drawPixel(frag.x, frag.y, WHITE, image); *1/ */
+                /* } */
+                drawPixel(frag.x, frag.y, color_out, in.image);
+            }
+        }
+    }
+}
+
+// light ortho
+/* float near_plane = 1.0f; */
+/* float far_plane = 10000.0f; */
+/* glm::mat4 lightProjection = glm::ortho(-2.0f, 2.0f, -2.0f, 2.0f, near_plane, far_plane); */
+
+void renderShape(Shape *shape, glm::mat4 projection, glm::mat4 view, glm::vec4 viewport, App *app) {
+
+    glm::mat4 rotation = glm::rotate(glm::radians(app->rotateY), glm::vec3(0, 1, 0));
+    glm::mat4 scale = glm::scale(glm::vec3(app->scale, app->scale, app->scale));
+    glm::mat4 translation = glm::translate(glm::vec3(app->translateX, app->translateY, 0));
+
+    glm::mat4 parentWorldMatrix = getParentMatrix((Node *)shape);
+    glm::mat4 model = parentWorldMatrix * rotation;
+    /* app->lightDir.y = cos(2 * glfwGetTime()); */
+    /* app->lightDir.x = 2 *sin(2 * glfwGetTime()); */
+
+    for (int i = 0; i < shape->faces.size(); i++) {
+
+        DefaultVertexShaderIn vertexIn = {.face = shape->faces[i],
+                                        .model = model,
+                                        .view = view,
+                                        .projection = projection,
+                                        .viewport = viewport};
+
+        DefaultVertexShaderOut vertexOut = runDefaultVertexProgram(vertexIn);
+
+        PhongFragmentShaderIn in = {.position = vertexOut.position,
+                                    .face = shape->faces[i],
+                                    .buffer = app->image.buffer,
+                                    .bufferWidth = app->image.width,
+                                    .bufferHeight = app->image.height,
+
+                                    .lightDir = app->lightDir,
+                                    .diffuseTexture = app->diffuseTexture,
+                                    .normalMapTexture = app->normalMapTexture,
+                                    .specTexture = app->specTexture,
+                                    .glowTexture = app->glowTexture,
+
+                                    .camPos = app->camera.pos,
+                                    .model = model,
+                                    .view = view,
+                                    .projection = projection,
+                                    .viewport = viewport,
+                                    .image = app->image};
+
+        runPhongFragmentProgram(in);
+    }
+}
+
+void renderWorld_r(Node *root, App *app, glm::mat4 projection, glm::mat4 view, glm::vec4 viewport) {
     std::vector<Node *> children = root->children;
     for (int i = 0; i < children.size(); i++) {
         Node *child = children[i];
         if (!strcmp(child->type, "shape")) {
-            renderShape(child, perspective, view, viewport, app);
+            // shape -> get shader
+            bool renderShadowMap = true; // config
+            if (renderShadowMap) {
+                glm::mat4 lightView =
+                    glm::lookAt(app->lightDir, glm::vec3(0.0f), glm::vec3(0.0f, 1.0f, 0.0f));
+                renderShape((Shape *)child, projection, lightView, viewport, app);
+            }
+            renderShape((Shape *)child, projection, view, viewport, app);
         }
-        renderWorld_r(child, app, perspective, view, viewport);
+        renderWorld_r(child, app, projection, view, viewport);
     }
 }
 
@@ -160,18 +352,19 @@ void trRender(App *app) {
     int width = image.width;
     int height = image.height;
 
-    glm::mat4 view = glm::lookAt(cam.pos, cam.target, cam.up);
     float zNear = 0.01f;
     float zFar = 1000.0f;
-    glm::mat4 perspective = glm::perspectiveLH(cam.fov, width / float(height), 0.01f, 1000.0f);
+
+    glm::mat4 view = glm::lookAt(cam.pos, cam.target, cam.up);
+    glm::mat4 projection = glm::perspectiveLH(cam.fov, width / float(height), 0.01f, 1000.0f);
     glm::vec4 viewport(0.0f, 0.0f, width - 1, height - 1);
 
     if (app->showAxis) {
-        drawAxis(view, perspective, viewport, image);
+        drawAxis(view, projection, viewport, image);
     }
 
     Node *root = app->world->worldRoot;
-    renderWorld_r(root, app, perspective, view, viewport);
+    renderWorld_r(root, app, projection, view, viewport);
 }
 
 #endif // __TYPES_H__

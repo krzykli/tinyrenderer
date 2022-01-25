@@ -20,6 +20,21 @@ void printVec3(const char *label, glm::vec3 vector) {
     printf("%s x:%f y:%f z:%f\n", label, vector.x, vector.y, vector.z);
 }
 
+inline u32 rgbToU32(u8 r, u8 g, u8 b) { return r | g << 8 | b << 16 | (255 << 24); }
+
+glm::vec3 barycentric(glm::vec3 A, glm::vec3 B, glm::vec3 C, glm::vec3 P) {
+    glm::vec3 s[2];
+    for (int i = 2; i--;) {
+        s[i][0] = C[i] - A[i];
+        s[i][1] = B[i] - A[i];
+        s[i][2] = A[i] - P[i];
+    }
+    glm::vec3 u = cross(s[0], s[1]);
+    if (std::abs(u[2]) > 1e-2)
+        return glm::vec3(1.f - (u.x + u.y) / u.z, u.y / u.z, u.x / u.z);
+    return glm::vec3(-1, 1, 1);
+}
+
 void drawLine(glm::vec3 v0, glm::vec3 v1, Image &image, u32 color) {
 
     int x0 = v0.x;
@@ -70,18 +85,6 @@ bool edgeFunction(glm::vec2 &a, glm::vec2 &b, glm::vec2 &c) {
     return ((c.x - a.x) * (b.y - a.y) - (c.y - a.y) * (b.x - a.x) >= 0);
 }
 
-glm::vec3 barycentric(glm::vec3 A, glm::vec3 B, glm::vec3 C, glm::vec3 P) {
-    glm::vec3 s[2];
-    for (int i = 2; i--;) {
-        s[i][0] = C[i] - A[i];
-        s[i][1] = B[i] - A[i];
-        s[i][2] = A[i] - P[i];
-    }
-    glm::vec3 u = cross(s[0], s[1]);
-    if (std::abs(u[2]) > 1e-2)
-        return glm::vec3(1.f - (u.x + u.y) / u.z, u.y / u.z, u.x / u.z);
-    return glm::vec3(-1, 1, 1);
-}
 
 /* void drawTriangle(glm::vec2 t0, glm::vec2 t1, glm::vec2 t2, Image &image, u32 color) { */
 /*     int minX = imin(imin(imin(t0.x, t1.x), t2.x), image.width - 1); */
@@ -168,8 +171,6 @@ glm::vec3 sampleTexture(int offset, Png texture) {
     return glm::vec3(r, g, b);
 }
 
-inline u32 rgbToU32(u8 r, u8 g, u8 b) { return r | g << 8 | b << 16 | (255 << 24); }
-
 void drawShadowbuffer(glm::vec3 t0, glm::vec3 t1, glm::vec3 t2, Image &image) {
     int minX = imin(imin(imin(t0.x, t1.x), t2.x), image.width - 1);
     int maxX = imax(imax(imax(t0.x, t1.x), t2.x), 0);
@@ -200,11 +201,17 @@ void drawShadowbuffer(glm::vec3 t0, glm::vec3 t1, glm::vec3 t2, Image &image) {
     }
 }
 
-void drawTriangleWithTexture(glm::vec3 t0, glm::vec3 t1, glm::vec3 t2, Image &image,
-                             Png diffuseTexture, Png normalMapTexture, Png specTexture,
-                             Png glowTexture, Face face, glm::vec3 *normals, glm::vec3 lightDir,
+void drawTriangleWithTexture(glm::vec3 t0, glm::vec3 t1, glm::vec3 t2,
+                             Face face, glm::vec3 *normals, glm::vec3 lightDir,
                              glm::mat4 model, glm::mat4 view, glm::mat4 perspective,
                              glm::vec4 viewport, glm::mat4 lightModelView, App *app) {
+
+    Png diffuseTexture = app->diffuseTexture;
+    Png specTexture = app->specTexture;
+    Png glowTexture = app->glowTexture;
+    Png normalMapTexture = app->normalMapTexture;
+    Image image = app->image;
+
     int minX = imin(imin(imin(t0.x, t1.x), t2.x), image.width - 1);
     int maxX = imax(imax(imax(t0.x, t1.x), t2.x), 0);
 
@@ -229,26 +236,6 @@ void drawTriangleWithTexture(glm::vec3 t0, glm::vec3 t1, glm::vec3 t2, Image &im
                 continue;
 
             glm::vec3 originalPoint = glm::unProject(frag, view * model, perspective, viewport);
-
-            glm::mat4 lightView =
-                glm::lookAt(app->lightDir, glm::vec3(0.0f), glm::vec3(0.0f, 1.0f, 0.0f));
-            float near_plane = 1.0f;
-            float far_plane = 10000.0f;
-            glm::mat4 lightProjection =
-                glm::ortho(-1.0f, 1.0f, -1.0f, 1.0f, near_plane, far_plane);
-
-            glm::vec3 projCoords = glm::project(glm::vec3(originalPoint), lightModelView, perspective, viewport);
-            projCoords.x = int(projCoords.x);
-            projCoords.y = int(projCoords.y);
-
-            int idx = projCoords.x + app->image.width * projCoords.y;
-            /* printf("x: %f y: %f ->index %i\n", projCoords.x, projCoords.y, idx); */
-            /* printf("shadowbuffer %f\n", image.shadowbuffer[idx]); */
-            /* float shadow = .3 + .7 * (image.shadowbuffer[idx] < (projCoords)[2]); // magic */
-            float shadow = 0.3 + .7 * (image.shadowbuffer[idx] - 0.0001 < projCoords.z); // magic
-            if (shadow) {
-                /* drawPixel(frag.x, frag.y, WHITE, image); */
-            }
 
             glm::mat3 modelVector = glm::transpose(glm::inverse(glm::mat3(view * model)));
 
@@ -281,22 +268,40 @@ void drawTriangleWithTexture(glm::vec3 t0, glm::vec3 t1, glm::vec3 t2, Image &im
             }
 
             glm::vec3 viewPos = app->camera.pos;
-
-            glm::vec3 viewDir = glm::normalize(viewPos - bc);
+            glm::vec3 viewDir = glm::normalize(viewPos - frag);
             glm::vec3 halfwayDir = glm::normalize(lightDir + viewDir);
-
-            float shininess = 40.0f;
-            /* float specWeight = 0.4f; // sample */
 
             glm::vec3 diffuseColor = sampleTexture(offset, diffuseTexture);
             glm::vec3 glowColor = sampleTexture(offset, glowTexture);
             float specWeight = sampleTexture(offset, specTexture)[0] / 255.0f;
+
+            float shininess = 40.0f;
             float spec = pow(fmaxf(glm::dot(normal, halfwayDir), 0.0), shininess);
 
-            glm::vec3 lightColor = glm::vec3(200, 200, 200);
+            glm::vec3 lightColor = glm::vec3(255, 200, 200);
+
+            // shadow
+            glm::mat4 lightView =
+                glm::lookAt(app->lightDir, glm::vec3(0.0f), glm::vec3(0.0f, 1.0f, 0.0f));
+            float near_plane = 1.0f;
+            float far_plane = 10000.0f;
+            glm::mat4 lightProjection = glm::ortho(-2.0f, 2.0f, -1.0f, 1.0f, near_plane, far_plane);
+
+            glm::vec3 projCoords =
+                glm::project(glm::vec3(originalPoint), lightModelView, perspective, viewport);
+            projCoords.x = int(projCoords.x);
+            projCoords.y = int(projCoords.y);
+
+            int idx = projCoords.x + app->image.width * projCoords.y;
+            /* printf("x: %f y: %f ->index %i\n", projCoords.x, projCoords.y, idx); */
+            /* printf("shadowbuffer %f\n", image.shadowbuffer[idx]); */
+            /* float shadow = .3 + .7 * (image.shadowbuffer[idx] < (projCoords)[2]); // magic */
+            float cosTheta = dot(normal, halfwayDir);
+            /* float shadow = 0.3 + .7 * (image.shadowbuffer[idx] - 0.000005 < projCoords.z); // magic */
+            float shadow = (image.shadowbuffer[idx] - 0.000005 < projCoords.z) > 0; // magic
 
             glm::vec3 color =
-                glowColor + (diffuseColor + lightColor * spec * specWeight) * intensity * shadow;
+                glowColor * glm::vec3(2) + (diffuseColor + lightColor * spec * specWeight) * intensity * shadow;
 
             u8 rsrgb = u8(linearToSrgb(fminf(color.r, 255) / 255.0f) * 255);
             u8 gsrgb = u8(linearToSrgb(fminf(color.g, 255) / 255.0f) * 255);
@@ -307,6 +312,9 @@ void drawTriangleWithTexture(glm::vec3 t0, glm::vec3 t1, glm::vec3 t2, Image &im
             int coord = int(frag.x + frag.y * image.width);
             if (image.zbuffer[coord] < frag.z) {
                 image.zbuffer[coord] = frag.z;
+                if (shadow) {
+                    /* drawPixel(frag.x, frag.y, WHITE, image); */
+                }
                 drawPixel(frag.x, frag.y, color_out, image);
             }
         }
