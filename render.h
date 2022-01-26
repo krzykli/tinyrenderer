@@ -275,8 +275,6 @@ void renderShape(Shape *shape, glm::mat4 projection, glm::mat4 view, glm::vec4 v
 
     glm::mat4 parentWorldMatrix = getParentMatrix((Node *)shape);
     glm::mat4 model = parentWorldMatrix * rotation;
-    /* app->lightDir.y = cos(2 * glfwGetTime()); */
-    /* app->lightDir.x = 2 *sin(2 * glfwGetTime()); */
 
     for (int i = 0; i < shape->faces.size(); i++) {
 
@@ -334,6 +332,49 @@ void renderShadowMap_r(Node *root, App *app, glm::mat4 projection, glm::mat4 vie
     }
 }
 
+float max_elevation_angle(float *zbuffer, glm::vec2 p, glm::vec2 dir, u32 width, u32 height) {
+    float maxangle = 0;
+    for (float t = 0.; t < 100.; t += 1.) {
+        glm::vec2 cur = p + dir * t;
+        if (cur.x >= width || cur.y >= height || cur.x < 0 || cur.y < 0)
+            return maxangle;
+
+        float distance = glm::length(p - cur);
+        if (distance < 30.0f)
+            continue;
+        float elevation =
+            zbuffer[int(cur.x) + int(cur.y) * width] - zbuffer[int(p.x) + int(p.y) * width];
+        maxangle = std::max(maxangle, atanf(elevation / distance));
+    }
+    return maxangle;
+}
+
+void screenSpaceAO(Image image) {
+    for (int x = 0; x < image.width; x++) {
+        for (int y = 0; y < image.height; y++) {
+            if (image.zbuffer[x + y * image.width] < 1e-5)
+                continue;
+            float total = 0;
+            for (float a = 0; a < M_PI * 2 - 1e-4; a += M_PI / 4) {
+                total += M_PI / 2 -
+                         max_elevation_angle(image.zbuffer, glm::vec2(x, y), glm::vec2(cos(a), sin(a)), image.width, image.height);
+            }
+            total /= (M_PI / 2) * 8;
+            total = pow(total, 30000.f);
+
+            int coord = int(x + y * image.width);
+            u32 color = image.buffer[coord];
+            u8 red = (color & 0x000000FF);
+            u8 green   = (color & 0x0000FF00) >> 8;
+            u8 blue   = (color & 0x00FF0000) >> 16;
+            image.buffer[coord] = rgbToU32(int(red * total), int(green * total), int(blue * total));
+
+            // debug
+            /* image.buffer[coord] = rgbToU32(255 * total, 255 * total, 255 * total); */
+        }
+    }
+}
+
 void trRender(App *app) {
     if (app->turntable) {
         app->rotateY = app->rotateY + app->turntableSpeed * app->deltaTime * 20;
@@ -351,6 +392,9 @@ void trRender(App *app) {
     float zNear = 0.01f;
     float zFar = 1000.0f;
 
+    app->lightDir.x = sin(3 * glfwGetTime());
+    app->lightDir.y = 2 * cos(3 * glfwGetTime());
+
     glm::mat4 view = glm::lookAt(cam.pos, cam.target, cam.up);
     glm::mat4 projection = glm::perspectiveLH(cam.fov, width / float(height), 0.01f, 1000.0f);
     glm::vec4 viewport(0.0f, 0.0f, width - 1, height - 1);
@@ -363,6 +407,7 @@ void trRender(App *app) {
 
     renderShadowMap_r(root, app, projection, getLightView(app->lightDir), viewport);
     renderWorld_r(root, app, projection, view, viewport);
+    /* screenSpaceAO(image); */
 }
 
 #endif // __TYPES_H__
