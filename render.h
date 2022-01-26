@@ -159,7 +159,6 @@ void runShadowFragmentProgram(UberFragmentShaderIn in) {
     }
 }
 
-
 void runUberFragmentProgram(UberFragmentShaderIn in) {
     glm::vec3 p0 = in.position[0];
     glm::vec3 p1 = in.position[1];
@@ -246,7 +245,8 @@ void runUberFragmentProgram(UberFragmentShaderIn in) {
             lightSpacePoint.y = int(lightSpacePoint.y);
 
             int idx = lightSpacePoint.x + in.image.width * lightSpacePoint.y;
-            float shadow = 0.3 + .7 * (in.image.shadowbuffer[idx] - 0.000005 < lightSpacePoint.z); //
+            float shadow =
+                0.3 + .7 * (in.image.shadowbuffer[idx] - 0.000005 < lightSpacePoint.z); //
 
             glm::vec3 color = glowColor * glm::vec3(2) +
                               (diffuseColor + lightColor * spec * specWeight) * intensity * shadow;
@@ -266,7 +266,8 @@ void runUberFragmentProgram(UberFragmentShaderIn in) {
     }
 }
 
-void renderShape(Shape *shape, glm::mat4 projection, glm::mat4 view, glm::vec4 viewport, App *app, void (*fragmentCallback)(UberFragmentShaderIn)) {
+void renderShape(Shape *shape, glm::mat4 projection, glm::mat4 view, glm::vec4 viewport, App *app,
+                 void (*fragmentCallback)(UberFragmentShaderIn)) {
 
     glm::mat4 rotation = glm::rotate(glm::radians(app->rotateY), glm::vec3(0, 1, 0));
     glm::mat4 scale = glm::scale(glm::vec3(app->scale, app->scale, app->scale));
@@ -280,31 +281,31 @@ void renderShape(Shape *shape, glm::mat4 projection, glm::mat4 view, glm::vec4 v
     for (int i = 0; i < shape->faces.size(); i++) {
 
         DefaultVertexShaderIn vertexIn = {.face = shape->faces[i],
-                                        .model = model,
-                                        .view = view,
-                                        .projection = projection,
-                                        .viewport = viewport};
+                                          .model = model,
+                                          .view = view,
+                                          .projection = projection,
+                                          .viewport = viewport};
 
         DefaultVertexShaderOut vertexOut = runDefaultVertexProgram(vertexIn);
 
         UberFragmentShaderIn in = {.position = vertexOut.position,
-                                    .face = shape->faces[i],
-                                    .buffer = app->image.buffer,
-                                    .bufferWidth = app->image.width,
-                                    .bufferHeight = app->image.height,
+                                   .face = shape->faces[i],
+                                   .buffer = app->image.buffer,
+                                   .bufferWidth = app->image.width,
+                                   .bufferHeight = app->image.height,
 
-                                    .lightDir = app->lightDir,
-                                    .diffuseTexture = app->diffuseTexture,
-                                    .normalMapTexture = app->normalMapTexture,
-                                    .specTexture = app->specTexture,
-                                    .glowTexture = app->glowTexture,
+                                   .lightDir = app->lightDir,
+                                   .diffuseTexture = app->diffuseTexture,
+                                   .normalMapTexture = app->normalMapTexture,
+                                   .specTexture = app->specTexture,
+                                   .glowTexture = app->glowTexture,
 
-                                    .camPos = app->camera.pos,
-                                    .model = model,
-                                    .view = view,
-                                    .projection = projection,
-                                    .viewport = viewport,
-                                    .image = app->image};
+                                   .camPos = app->camera.pos,
+                                   .model = model,
+                                   .view = view,
+                                   .projection = projection,
+                                   .viewport = viewport,
+                                   .image = app->image};
 
         fragmentCallback(in);
     }
@@ -321,7 +322,8 @@ void renderWorld_r(Node *root, App *app, glm::mat4 projection, glm::mat4 view, g
     }
 }
 
-void renderShadowMap_r(Node *root, App *app, glm::mat4 projection, glm::mat4 view, glm::vec4 viewport) {
+void renderShadowMap_r(Node *root, App *app, glm::mat4 projection, glm::mat4 view,
+                       glm::vec4 viewport) {
     std::vector<Node *> children = root->children;
     for (int i = 0; i < children.size(); i++) {
         Node *child = children[i];
