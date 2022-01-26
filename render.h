@@ -49,7 +49,6 @@ glm::mat4 getLightProjection() {
     return glm::ortho(-2.0f, 2.0f, -2.0f, 2.0f, nearPlane, farPlane);
 }
 
-
 typedef struct DefaultVertexShaderOut {
     glm::vec3 position[3];
     glm::vec3 normals[3];
@@ -267,7 +266,7 @@ void runUberFragmentProgram(UberFragmentShaderIn in) {
     }
 }
 
-void renderShape(Shape *shape, glm::mat4 projection, glm::mat4 view, glm::vec4 viewport, App *app) {
+void renderShape(Shape *shape, glm::mat4 projection, glm::mat4 view, glm::vec4 viewport, App *app, void (*fragmentCallback)(UberFragmentShaderIn)) {
 
     glm::mat4 rotation = glm::rotate(glm::radians(app->rotateY), glm::vec3(0, 1, 0));
     glm::mat4 scale = glm::scale(glm::vec3(app->scale, app->scale, app->scale));
@@ -307,51 +306,7 @@ void renderShape(Shape *shape, glm::mat4 projection, glm::mat4 view, glm::vec4 v
                                     .viewport = viewport,
                                     .image = app->image};
 
-        runUberFragmentProgram(in);
-    }
-}
-
-void renderShapeShadow(Shape *shape, glm::mat4 projection, glm::mat4 view, glm::vec4 viewport, App *app) {
-
-    glm::mat4 rotation = glm::rotate(glm::radians(app->rotateY), glm::vec3(0, 1, 0));
-    glm::mat4 scale = glm::scale(glm::vec3(app->scale, app->scale, app->scale));
-    glm::mat4 translation = glm::translate(glm::vec3(app->translateX, app->translateY, 0));
-
-    glm::mat4 parentWorldMatrix = getParentMatrix((Node *)shape);
-    glm::mat4 model = parentWorldMatrix * rotation;
-    /* app->lightDir.y = cos(2 * glfwGetTime()); */
-    /* app->lightDir.x = 2 *sin(2 * glfwGetTime()); */
-
-    for (int i = 0; i < shape->faces.size(); i++) {
-
-        DefaultVertexShaderIn vertexIn = {.face = shape->faces[i],
-                                        .model = model,
-                                        .view = view,
-                                        .projection = projection,
-                                        .viewport = viewport};
-
-        DefaultVertexShaderOut vertexOut = runDefaultVertexProgram(vertexIn);
-
-        UberFragmentShaderIn in = {.position = vertexOut.position,
-                                    .face = shape->faces[i],
-                                    .buffer = app->image.buffer,
-                                    .bufferWidth = app->image.width,
-                                    .bufferHeight = app->image.height,
-
-                                    .lightDir = app->lightDir,
-                                    .diffuseTexture = app->diffuseTexture,
-                                    .normalMapTexture = app->normalMapTexture,
-                                    .specTexture = app->specTexture,
-                                    .glowTexture = app->glowTexture,
-
-                                    .camPos = app->camera.pos,
-                                    .model = model,
-                                    .view = view,
-                                    .projection = projection,
-                                    .viewport = viewport,
-                                    .image = app->image};
-
-        runShadowFragmentProgram(in);
+        fragmentCallback(in);
     }
 }
 
@@ -360,7 +315,7 @@ void renderWorld_r(Node *root, App *app, glm::mat4 projection, glm::mat4 view, g
     for (int i = 0; i < children.size(); i++) {
         Node *child = children[i];
         if (!strcmp(child->type, "shape")) {
-            renderShape((Shape *)child, projection, view, viewport, app);
+            renderShape((Shape *)child, projection, view, viewport, app, runUberFragmentProgram);
         }
         renderWorld_r(child, app, projection, view, viewport);
     }
@@ -371,7 +326,7 @@ void renderShadowMap_r(Node *root, App *app, glm::mat4 projection, glm::mat4 vie
     for (int i = 0; i < children.size(); i++) {
         Node *child = children[i];
         if (!strcmp(child->type, "shape")) {
-            renderShapeShadow((Shape *)child, projection, view, viewport, app);
+            renderShape((Shape *)child, projection, view, viewport, app, runShadowFragmentProgram);
         }
         renderShadowMap_r(child, app, projection, view, viewport);
     }

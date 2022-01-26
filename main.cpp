@@ -188,7 +188,7 @@ void flipBuffersVertically(Image &image) {
     flipBufferU32(image.depth, width, height);
     flipBufferU32(image.glow, width, height);
     flipBufferF(image.zbuffer, width, height);
-    /* flipBufferF(image.shadowbuffer, width, height); */
+    flipBufferF(image.shadowbuffer, width, height);
 }
 
 
@@ -583,7 +583,8 @@ int main(int argc, char **argv) {
     t3.node.name = "armadillo_root";
     t3.node.type = "transform";
     glm::mat4 rotation = glm::rotate(glm::radians(90.1f), glm::vec3(0, 1, 0));
-    t3.matrix = glm::translate(glm::mat4(1), glm::vec3(-2.0f, 0.0f, 0.0f)) * rotation;
+    glm::mat4 scale = glm::scale(glm::vec3(0.5));
+    t3.matrix = scale * glm::translate(glm::mat4(1), glm::vec3(-2.0f, 0.0f, 0.0f)) * rotation;
 
     Shape armadilloShape;
     armadilloShape.node.parent = (Node *)&t3;
