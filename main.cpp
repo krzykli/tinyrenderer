@@ -188,7 +188,7 @@ void flipBuffersVertically(Image &image) {
     flipBufferU32(image.depth, width, height);
     flipBufferU32(image.glow, width, height);
     flipBufferF(image.zbuffer, width, height);
-    flipBufferF(image.shadowbuffer, width, height);
+    /* flipBufferF(image.shadowbuffer, width, height); */
 }
 
 
@@ -385,7 +385,7 @@ void initAppDefaults() {
     app.specTexture = {};
 
     app.normalLength = 0.1f;
-    app.lightDir = glm::vec3(5, 5, 5);
+    app.lightDir = glm::vec3(3, 3, 3);
 
     app.showAxis = false;
     app.turntable = false;

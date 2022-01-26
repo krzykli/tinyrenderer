@@ -39,6 +39,17 @@ glm::mat4 getParentMatrix(Node *node) {
     return matrix;
 }
 
+inline glm::mat4 getLightView(glm::vec3 lightDir) {
+    return glm::lookAt(lightDir, glm::vec3(0.0f), glm::vec3(0.0f, 1.0f, 0.0f));
+}
+
+glm::mat4 getLightProjection() {
+    float nearPlane = 0.01f;
+    float farPlane = 10000.0f;
+    return glm::ortho(-2.0f, 2.0f, -2.0f, 2.0f, nearPlane, farPlane);
+}
+
+
 typedef struct DefaultVertexShaderOut {
     glm::vec3 position[3];
     glm::vec3 normals[3];
@@ -52,7 +63,7 @@ typedef struct DefaultVertexShaderIn {
     glm::vec4 viewport;
 } DefaultVertexShaderIn;
 
-typedef struct PhongFragmentShaderIn {
+typedef struct UberFragmentShaderIn {
     glm::vec3 *position;
     Face face;
 
@@ -73,19 +84,12 @@ typedef struct PhongFragmentShaderIn {
     glm::vec4 viewport;
 
     Image image;
-} PhongFragmentShaderIn;
+} UberFragmentShaderIn;
 
-typedef struct ShadowFragmentShaderIn {
-    glm::vec3 *position;
-    u32 *buffer;
-    u32 bufferWidth;
-    u32 bufferHeight;
-} ShadowFragmentShaderIn;
-
-typedef struct PhongFragmentShaderOut {
+typedef struct UberFragmentShaderOut {
     glm::vec2 screenCoords;
     glm::vec3 color;
-} PhongFragmentShaderOut;
+} UberFragmentShaderOut;
 
 DefaultVertexShaderOut runDefaultVertexProgram(DefaultVertexShaderIn in) {
     glm::mat4 modelView = in.view * in.model;
@@ -122,7 +126,7 @@ glm::vec3 computeBarycentricCoords(glm::vec3 A, glm::vec3 B, glm::vec3 C, glm::v
     return glm::vec3(-1, 1, 1);
 }
 
-void runShadowFragmentProgram(ShadowFragmentShaderIn in) {
+void runShadowFragmentProgram(UberFragmentShaderIn in) {
     glm::vec3 p0 = in.position[0];
     glm::vec3 p1 = in.position[1];
     glm::vec3 p2 = in.position[2];
@@ -148,15 +152,16 @@ void runShadowFragmentProgram(ShadowFragmentShaderIn in) {
             frag.z += p1.z * barCoords[1];
             frag.z += p2.z * barCoords[2];
 
-            int coord = int(frag.x + frag.y * in.bufferWidth);
-            if (in.buffer[coord] < frag.z) {
-                in.buffer[coord] = frag.z;
+            int coord = int(frag.x + frag.y * in.image.width);
+            if (in.image.shadowbuffer[coord] < frag.z) {
+                in.image.shadowbuffer[coord] = frag.z;
             }
         }
     }
 }
 
-void runPhongFragmentProgram(PhongFragmentShaderIn in) {
+
+void runUberFragmentProgram(UberFragmentShaderIn in) {
     glm::vec3 p0 = in.position[0];
     glm::vec3 p1 = in.position[1];
     glm::vec3 p2 = in.position[2];
@@ -170,6 +175,9 @@ void runPhongFragmentProgram(PhongFragmentShaderIn in) {
     glm::vec3 frag;
 
     glm::mat4 modelView = in.view * in.model;
+
+    glm::mat4 lightView = getLightView(in.lightDir);
+    glm::mat4 lightModelView = lightView * in.model;
 
     u32 textureWidth = in.diffuseTexture.width; // all of them are the same
     u32 textureHeight = in.diffuseTexture.height;
@@ -186,8 +194,6 @@ void runPhongFragmentProgram(PhongFragmentShaderIn in) {
             frag.z += p0.z * barCoords[0];
             frag.z += p1.z * barCoords[1];
             frag.z += p2.z * barCoords[2];
-
-            glm::vec3 originalPoint = glm::unProject(frag, modelView, in.projection, in.viewport);
 
             glm::mat3 modelVector = glm::transpose(glm::inverse(glm::mat3(modelView)));
 
@@ -233,26 +239,19 @@ void runPhongFragmentProgram(PhongFragmentShaderIn in) {
             glm::vec3 lightColor = glm::vec3(255, 200, 200);
 
             // shadow
-            /* glm::mat4 lightView = */
-            /*     glm::lookAt(in.lightDir, glm::vec3(0.0f), glm::vec3(0.0f, 1.0f, 0.0f)); */
-            /* float near_plane = 1.0f; */
-            /* float far_plane = 10000.0f; */
-            /* glm::mat4 lightProjection = glm::ortho(-2.0f, 2.0f, -1.0f, 1.0f, near_plane, far_plane); */
 
-            /* glm::vec3 projCoords = */
-            /*     glm::project(glm::vec3(originalPoint), lightModelView, in.projection, in.viewport); */
-            /* projCoords.x = int(projCoords.x); */
-            /* projCoords.y = int(projCoords.y); */
+            glm::vec3 originalPoint = glm::unProject(frag, modelView, in.projection, in.viewport);
+            glm::vec3 lightSpacePoint =
+                glm::project(glm::vec3(originalPoint), lightModelView, in.projection, in.viewport);
+            lightSpacePoint.x = int(lightSpacePoint.x);
+            lightSpacePoint.y = int(lightSpacePoint.y);
 
-            /* int idx = projCoords.x + app->image.width * projCoords.y; */
-            /* float shadow = 0.3 + .7 * (image.shadowbuffer[idx] - 0.000005 < projCoords.z); // */
+            int idx = lightSpacePoint.x + in.image.width * lightSpacePoint.y;
+            float shadow = 0.3 + .7 * (in.image.shadowbuffer[idx] - 0.000005 < lightSpacePoint.z); //
 
-            /* glm::vec3 color = glowColor * glm::vec3(2) + */
-            /*                   (diffuseColor + lightColor * spec * specWeight) * intensity * shadow; */
-            //
             glm::vec3 color = glowColor * glm::vec3(2) +
-                              (diffuseColor + lightColor * spec * specWeight) * intensity;
-
+                              (diffuseColor + lightColor * spec * specWeight) * intensity * shadow;
+            //
             u8 rsrgb = u8(linearToSrgb(fminf(color.r, 255) / 255.0f) * 255);
             u8 gsrgb = u8(linearToSrgb(fminf(color.g, 255) / 255.0f) * 255);
             u8 bsrgb = u8(linearToSrgb(fminf(color.b, 255) / 255.0f) * 255);
@@ -262,19 +261,11 @@ void runPhongFragmentProgram(PhongFragmentShaderIn in) {
             int coord = int(frag.x + frag.y * in.image.width);
             if (in.image.zbuffer[coord] < frag.z) {
                 in.image.zbuffer[coord] = frag.z;
-                /* if (shadow) { */
-                /*     /1* drawPixel(frag.x, frag.y, WHITE, image); *1/ */
-                /* } */
                 drawPixel(frag.x, frag.y, color_out, in.image);
             }
         }
     }
 }
-
-// light ortho
-/* float near_plane = 1.0f; */
-/* float far_plane = 10000.0f; */
-/* glm::mat4 lightProjection = glm::ortho(-2.0f, 2.0f, -2.0f, 2.0f, near_plane, far_plane); */
 
 void renderShape(Shape *shape, glm::mat4 projection, glm::mat4 view, glm::vec4 viewport, App *app) {
 
@@ -297,7 +288,7 @@ void renderShape(Shape *shape, glm::mat4 projection, glm::mat4 view, glm::vec4 v
 
         DefaultVertexShaderOut vertexOut = runDefaultVertexProgram(vertexIn);
 
-        PhongFragmentShaderIn in = {.position = vertexOut.position,
+        UberFragmentShaderIn in = {.position = vertexOut.position,
                                     .face = shape->faces[i],
                                     .buffer = app->image.buffer,
                                     .bufferWidth = app->image.width,
@@ -316,7 +307,51 @@ void renderShape(Shape *shape, glm::mat4 projection, glm::mat4 view, glm::vec4 v
                                     .viewport = viewport,
                                     .image = app->image};
 
-        runPhongFragmentProgram(in);
+        runUberFragmentProgram(in);
+    }
+}
+
+void renderShapeShadow(Shape *shape, glm::mat4 projection, glm::mat4 view, glm::vec4 viewport, App *app) {
+
+    glm::mat4 rotation = glm::rotate(glm::radians(app->rotateY), glm::vec3(0, 1, 0));
+    glm::mat4 scale = glm::scale(glm::vec3(app->scale, app->scale, app->scale));
+    glm::mat4 translation = glm::translate(glm::vec3(app->translateX, app->translateY, 0));
+
+    glm::mat4 parentWorldMatrix = getParentMatrix((Node *)shape);
+    glm::mat4 model = parentWorldMatrix * rotation;
+    /* app->lightDir.y = cos(2 * glfwGetTime()); */
+    /* app->lightDir.x = 2 *sin(2 * glfwGetTime()); */
+
+    for (int i = 0; i < shape->faces.size(); i++) {
+
+        DefaultVertexShaderIn vertexIn = {.face = shape->faces[i],
+                                        .model = model,
+                                        .view = view,
+                                        .projection = projection,
+                                        .viewport = viewport};
+
+        DefaultVertexShaderOut vertexOut = runDefaultVertexProgram(vertexIn);
+
+        UberFragmentShaderIn in = {.position = vertexOut.position,
+                                    .face = shape->faces[i],
+                                    .buffer = app->image.buffer,
+                                    .bufferWidth = app->image.width,
+                                    .bufferHeight = app->image.height,
+
+                                    .lightDir = app->lightDir,
+                                    .diffuseTexture = app->diffuseTexture,
+                                    .normalMapTexture = app->normalMapTexture,
+                                    .specTexture = app->specTexture,
+                                    .glowTexture = app->glowTexture,
+
+                                    .camPos = app->camera.pos,
+                                    .model = model,
+                                    .view = view,
+                                    .projection = projection,
+                                    .viewport = viewport,
+                                    .image = app->image};
+
+        runShadowFragmentProgram(in);
     }
 }
 
@@ -325,16 +360,20 @@ void renderWorld_r(Node *root, App *app, glm::mat4 projection, glm::mat4 view, g
     for (int i = 0; i < children.size(); i++) {
         Node *child = children[i];
         if (!strcmp(child->type, "shape")) {
-            // shape -> get shader
-            bool renderShadowMap = true; // config
-            if (renderShadowMap) {
-                glm::mat4 lightView =
-                    glm::lookAt(app->lightDir, glm::vec3(0.0f), glm::vec3(0.0f, 1.0f, 0.0f));
-                renderShape((Shape *)child, projection, lightView, viewport, app);
-            }
             renderShape((Shape *)child, projection, view, viewport, app);
         }
         renderWorld_r(child, app, projection, view, viewport);
+    }
+}
+
+void renderShadowMap_r(Node *root, App *app, glm::mat4 projection, glm::mat4 view, glm::vec4 viewport) {
+    std::vector<Node *> children = root->children;
+    for (int i = 0; i < children.size(); i++) {
+        Node *child = children[i];
+        if (!strcmp(child->type, "shape")) {
+            renderShapeShadow((Shape *)child, projection, view, viewport, app);
+        }
+        renderShadowMap_r(child, app, projection, view, viewport);
     }
 }
 
@@ -364,6 +403,8 @@ void trRender(App *app) {
     }
 
     Node *root = app->world->worldRoot;
+
+    renderShadowMap_r(root, app, projection, getLightView(app->lightDir), viewport);
     renderWorld_r(root, app, projection, view, viewport);
 }
 
