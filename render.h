@@ -173,6 +173,10 @@ void runUberFragmentProgram(UberFragmentShaderIn in) {
     glm::vec3 frag;
 
     glm::mat4 modelView = in.view * in.model;
+    glm::mat3 modelVector = glm::transpose(glm::inverse(glm::mat3(modelView)));
+
+    glm::vec3 T = glm::normalize(modelVector * in.face.tangent);
+    glm::vec3 B = glm::normalize(modelVector * in.face.bitangent);
 
     glm::mat4 lightView = getLightView(in.lightDir);
     glm::mat4 lightModelView = lightView * in.model;
@@ -193,8 +197,6 @@ void runUberFragmentProgram(UberFragmentShaderIn in) {
             frag.z += p1.z * barCoords[1];
             frag.z += p2.z * barCoords[2];
 
-            glm::mat3 modelVector = glm::transpose(glm::inverse(glm::mat3(modelView)));
-
             glm::vec3 uv = toBarycentric(barCoords, in.face.uvs);
             glm::vec3 barycentricNormal = toBarycentric(barCoords, in.face.normals);
 
@@ -202,8 +204,6 @@ void runUberFragmentProgram(UberFragmentShaderIn in) {
             glm::vec3 edge1 = p1 - p0;
             glm::vec3 edge2 = p2 - p0;
 
-            glm::vec3 T = glm::normalize(modelVector * in.face.tangent);
-            glm::vec3 B = glm::normalize(modelVector * in.face.bitangent);
             glm::vec3 N = glm::normalize(barycentricNormal);
 
             tangentSpace[0] = T;
@@ -217,6 +217,7 @@ void runUberFragmentProgram(UberFragmentShaderIn in) {
 
             glm::vec3 textureNormal = sampleNormalTexture(offset, in.normalMapTexture);
             glm::vec3 normal = glm::normalize(tangentSpace * textureNormal);
+            glm::vec3 glowColor = sampleTexture(offset, in.glowTexture) * glm::vec3(2);
 
             float intensity = glm::dot(normal, glm::normalize(in.lightDir));
             if (intensity < 0) {
@@ -228,7 +229,6 @@ void runUberFragmentProgram(UberFragmentShaderIn in) {
             glm::vec3 halfwayDir = glm::normalize(in.lightDir + viewDir);
 
             glm::vec3 diffuseColor = sampleTexture(offset, in.diffuseTexture);
-            glm::vec3 glowColor = sampleTexture(offset, in.glowTexture);
             float specWeight = sampleTexture(offset, in.specTexture)[0] / 255.0f;
 
             float shininess = 40.0f;
@@ -248,7 +248,7 @@ void runUberFragmentProgram(UberFragmentShaderIn in) {
             float shadow =
                 0.3 + .7 * (in.image.shadowbuffer[idx] - 0.000005 < lightSpacePoint.z); //
 
-            glm::vec3 color = glowColor * glm::vec3(2) +
+            glm::vec3 color = glowColor +
                               (diffuseColor + lightColor * spec * specWeight) * intensity * shadow;
             //
             u8 rsrgb = u8(linearToSrgb(fminf(color.r, 255) / 255.0f) * 255);
@@ -259,8 +259,11 @@ void runUberFragmentProgram(UberFragmentShaderIn in) {
 
             int coord = int(frag.x + frag.y * in.image.width);
             if (in.image.zbuffer[coord] < frag.z) {
-                in.image.zbuffer[coord] = frag.z;
-                drawPixel(frag.x, frag.y, color_out, in.image);
+                bool shouldRender = boundsCheck(frag.x, frag.y, in.image.width, in.image.height);
+                if (shouldRender) {
+                    in.image.zbuffer[coord] = frag.z;
+                    in.image.buffer[coord] = color_out;
+                }
             }
         }
     }

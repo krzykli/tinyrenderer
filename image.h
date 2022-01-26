@@ -10,6 +10,10 @@ u32 GREEN = 0 | (255 << 8) | (0 << 16) | (0 << 24);
 u32 BLUE = 0 | (0 << 8) | (255 << 16) | (0 << 24);
 u32 WHITE = 255 | (255 << 8) | (255 << 16) | (255 << 24);
 
+inline bool boundsCheck(u32 x, u32 y, u32 width, u32 height) {
+    return (x > 0 && x <= width - 1 && y > 0 && y <= height - 1);
+}
+
 void drawPixel(u32 x, u32 y, u32 color, Image &image) {
     if (x > 0 && x <= image.width - 1 && y > 0 && y <= image.height - 1) {
         image.buffer[x + image.width * y] = color;
@@ -21,6 +25,10 @@ void printVec3(const char *label, glm::vec3 vector) {
 }
 
 inline u32 rgbToU32(u8 r, u8 g, u8 b) { return r | g << 8 | b << 16 | (255 << 24); }
+
+inline u32 vec3ToU32(glm::vec3 v) {
+    return int(v.x) | int(v.y) << 8 | int(v.z) << 16 | (255 << 24);
+}
 
 glm::vec3 barycentric(glm::vec3 A, glm::vec3 B, glm::vec3 C, glm::vec3 P) {
     glm::vec3 s[2];
